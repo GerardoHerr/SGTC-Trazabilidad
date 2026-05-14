@@ -12,4 +12,5 @@ uvicorn main:app --reload
 Ejecutar Frontend:
 
 cd Frontend
+npm install
 npm start
