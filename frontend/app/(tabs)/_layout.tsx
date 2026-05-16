@@ -32,6 +32,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="Parcelas"
+        options={{
+          title: 'Parcelas',
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="map-outline" size={28} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="Personal"
         options={{
           title: 'Personal',

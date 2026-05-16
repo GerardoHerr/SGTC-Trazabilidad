@@ -1,5 +1,30 @@
 from enum import Enum
 
+# ── Parcela ──────────────────────────────────────────────
+class EstadoParcela(str, Enum):
+    LIBRE = "Libre"
+    EN_PROCESO = "En Proceso"
+    EN_PRODUCCION = "En Producción"
+
+class TipoTerreno(str, Enum):
+    REGULAR = "Regular"
+    IRREGULAR = "Irregular"
+
+class TipoZona(str, Enum):
+    ZONA_PLANA = "Zona Plana"
+    ZONA_INCLINADA = "Zona Inclinada"
+    ZONA_BAJA = "Zona Baja"
+    ZONA_ALTA = "Zona Alta"
+
+class TexturaSuelo(str, Enum):
+    FRANCO_ARENOSA = "Franco-arenosa"
+    FRANCO_ARCILLOSA = "Franco-arcillosa"
+
+class OrientacionLadera(str, Enum):
+    NORTE = "Orientación al Norte"
+    SUR = "Orientación al Sur"
+
+# ── Personal ─────────────────────────────────────────────
 class RolTrabajador(str, Enum):
     RECOLECTOR = "Recolector"
     FUMIGADOR = "Fumigador"
