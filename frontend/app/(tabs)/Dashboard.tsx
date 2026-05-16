@@ -34,17 +34,17 @@ export default function DashboardScreen() {
             size="small"
             style={{ marginTop: Spacing.lg }}
         />
-        <Button 
-            title="Personal" 
-            onPress={() => {}} 
+        <Button
+            title="Personal"
+            onPress={() => router.push('/(tabs)/Personal')}
             variant="primary"
             size="small"
             style={{ marginTop: Spacing.lg }}
         />
 
-        <Button 
-            title="Parcelas" 
-            onPress={() => {}} 
+        <Button
+            title="Parcelas"
+            onPress={() => router.push('/(tabs)/Parcelas')}
             variant="tertiary"
             size="small"
             style={{ marginTop: Spacing.lg }}

@@ -271,9 +271,19 @@ export default function DetalleParcela() {
         });
     };
 
+    const filterDecimal = (value: string) => {
+        const cleaned = value.replace(/[^0-9.]/g, '');
+        const parts = cleaned.split('.');
+        return parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : cleaned;
+    };
+
     const handleChange = (field: keyof EditForm, value: string) => {
+        let filtered = value;
+        if (field === 'hectareas' || field === 'ph_suelo') {
+            filtered = filterDecimal(value);
+        }
         setForm((prev) => {
-            const next = { ...prev, [field]: value } as EditForm;
+            const next = { ...prev, [field]: filtered } as EditForm;
             if (field === 'tipo_terreno') next.tipo_zona = [];
             return next;
         });

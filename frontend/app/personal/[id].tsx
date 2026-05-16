@@ -165,16 +165,32 @@ export default function PerfilTrabajador() {
     };
 
     const handleChange = (field: keyof EditForm, value: string) => {
-        setForm((prev) => ({ ...prev, [field]: value }));
+        let filtered = value;
+        if (field === 'nombres' || field === 'apellidos') {
+            filtered = value.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\-']/g, '').slice(0, 80);
+        } else if (field === 'identificacion') {
+            filtered = value.replace(/\D/g, '').slice(0, 10);
+        } else if (field === 'telefono') {
+            filtered = value.replace(/\D/g, '').slice(0, 10);
+        }
+        setForm((prev) => ({ ...prev, [field]: filtered }));
         setSuccessMsg(null);
         setError(null);
     };
 
     const validateForm = (): boolean => {
         if (!form.nombres.trim()) { setError('El campo Nombres es obligatorio'); return false; }
+        if (form.nombres.trim().length < 2) { setError('El nombre debe tener al menos 2 caracteres'); return false; }
         if (!form.apellidos.trim()) { setError('El campo Apellidos es obligatorio'); return false; }
+        if (form.apellidos.trim().length < 2) { setError('Los apellidos deben tener al menos 2 caracteres'); return false; }
+        if (!trabajador?.tiene_asignaciones_activas && !form.identificacion.trim()) {
+            setError('El campo Identificación es obligatorio'); return false;
+        }
+        if (!trabajador?.tiene_asignaciones_activas && form.identificacion.length < 6) {
+            setError('La identificación debe tener entre 6 y 10 dígitos'); return false;
+        }
         if (!form.telefono.trim()) { setError('El campo Teléfono es obligatorio'); return false; }
-        if (!/^\d+$/.test(form.telefono)) { setError('El teléfono debe contener solo números'); return false; }
+        if (form.telefono.length !== 10) { setError('El teléfono debe tener exactamente 10 dígitos'); return false; }
         if (!form.rol) { setError('Debes seleccionar un Rol'); return false; }
         return true;
     };

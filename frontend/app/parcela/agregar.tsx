@@ -198,10 +198,21 @@ export default function AgregarParcela() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
+    const filterDecimal = (value: string) => {
+        const cleaned = value.replace(/[^0-9.]/g, '');
+        const parts = cleaned.split('.');
+        return parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : cleaned;
+    };
+
     const handleChange = (field: keyof FormState, value: string) => {
+        let filtered = value;
+        if (field === 'hectareas' || field === 'ph_suelo' || field === 'altitud_msnm') {
+            filtered = filterDecimal(value);
+        } else if (field === 'codigo') {
+            filtered = value.slice(0, 20);
+        }
         setForm((prev) => {
-            const next = { ...prev, [field]: value } as FormState;
-            // Resetear zonas al cambiar el tipo de terreno
+            const next = { ...prev, [field]: filtered } as FormState;
             if (field === 'tipo_terreno') next.tipo_zona = [];
             return next;
         });
