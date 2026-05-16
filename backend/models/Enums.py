@@ -1,5 +1,12 @@
 from enum import Enum
 
+class RolTrabajador(str, Enum):
+    RECOLECTOR = "Recolector"
+    FUMIGADOR = "Fumigador"
+    OPERARIO = "Operario"
+    SUPERVISOR = "Supervisor"
+    CAPATAZ = "Capataz"
+
 class VariedadCafe(str, Enum):
     CATURRA = "Caturra"
     CASTILLO = "Castillo"
