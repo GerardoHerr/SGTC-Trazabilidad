@@ -8,6 +8,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getOpciones, addOpcion } from '@/services/catalogo_service';
 import { Stack, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BorderRadius, Colors, Spacing, Typography } from '@/constants/theme';
@@ -69,24 +71,114 @@ function TextField({
 }
 
 function PickerField({
-    label, value, options, onSelect, icon, colors,
+    label, value, options: initialOptions, onSelect, icon, colors,
+    allowAdd = true, storageKey,
 }: {
     label: string; value: string; options: string[];
     onSelect: (v: string) => void; icon: string; colors: any;
+    allowAdd?: boolean; storageKey?: string;
 }) {
     const [open, setOpen] = useState(false);
+    const [options, setOptions] = useState(initialOptions);
+    const [showNew, setShowNew] = useState(false);
+    const [newItem, setNewItem] = useState('');
+    const [confirmando, setConfirmando] = useState(false);
+
+    useEffect(() => {
+        if (!storageKey) return;
+        getOpciones(storageKey)
+            .then((serverOpts: string[]) => {
+                setOptions([...new Set([...initialOptions, ...serverOpts])]);
+                AsyncStorage.setItem(storageKey, JSON.stringify(serverOpts));
+            })
+            .catch(() => {
+                AsyncStorage.getItem(storageKey).then(stored => {
+                    if (stored) {
+                        const cached: string[] = JSON.parse(stored);
+                        setOptions(prev => [...new Set([...prev, ...cached])]);
+                    }
+                });
+            });
+    }, []);
+
+    const handleAddNew = () => {
+        if (!newItem.trim()) return;
+        setConfirmando(true);
+    };
+
+    const confirmAdd = async () => {
+        const trimmed = newItem.trim();
+        setConfirmando(false);
+        try {
+            const serverOpts: string[] = storageKey
+                ? await addOpcion(storageKey, trimmed)
+                : [...options, trimmed];
+            const merged = [...new Set([...initialOptions, ...serverOpts])];
+            setOptions(merged);
+            if (storageKey) AsyncStorage.setItem(storageKey, JSON.stringify(serverOpts));
+        } catch {
+            const updated = options.includes(trimmed) ? options : [...options, trimmed];
+            setOptions(updated);
+            if (storageKey) {
+                const custom = updated.filter(o => !initialOptions.includes(o));
+                AsyncStorage.setItem(storageKey, JSON.stringify(custom));
+            }
+        }
+        onSelect(trimmed);
+        setNewItem('');
+        setShowNew(false);
+        setOpen(false);
+    };
+
     return (
         <View style={styles.fieldContainer}>
-            <Text style={[styles.label, { color: colors.onSurface }]}>{label}</Text>
+            {allowAdd ? (
+                <View style={styles.labelRow}>
+                    <Text style={[styles.label, { color: colors.onSurface }]}>{label}</Text>
+                    <TouchableOpacity onPress={() => { setShowNew(!showNew); setOpen(false); }} style={styles.addIconBtn}>
+                        <MaterialCommunityIcons name="plus-circle-outline" size={20} color={colors.secondary} />
+                    </TouchableOpacity>
+                </View>
+            ) : (
+                <Text style={[styles.label, { color: colors.onSurface }]}>{label}</Text>
+            )}
             <TouchableOpacity
                 style={[styles.inputRow, { borderColor: colors.outlineVariant, backgroundColor: colors.surfaceContainerLow }]}
-                onPress={() => setOpen(!open)} activeOpacity={0.7}>
+                onPress={() => { setOpen(!open); setShowNew(false); }} activeOpacity={0.7}>
                 <MaterialCommunityIcons name={icon as any} size={17} color={colors.secondary} />
                 <Text style={[styles.textInput, { color: value ? colors.onSurface : colors.onSurfaceVariant }]}>
                     {value || `Seleccionar ${label.replace(' *', '').toLowerCase()}`}
                 </Text>
                 <MaterialCommunityIcons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
+            {allowAdd && showNew && (
+                <View style={[styles.addNewRow, { borderColor: colors.secondary, backgroundColor: colors.surfaceContainerLow }]}>
+                    <TextInput
+                        style={[styles.addNewInput, { color: colors.onSurface }]}
+                        placeholder="Nuevo valor..."
+                        placeholderTextColor={colors.onSurfaceVariant}
+                        value={newItem}
+                        onChangeText={(t) => { setNewItem(t); setConfirmando(false); }}
+                        autoFocus
+                    />
+                    <TouchableOpacity onPress={handleAddNew} style={[styles.addNewConfirm, { backgroundColor: colors.secondary }]}>
+                        <MaterialCommunityIcons name="check" size={16} color={colors.onSecondary ?? '#fff'} />
+                    </TouchableOpacity>
+                </View>
+            )}
+            {confirmando && (
+                <View style={[styles.confirmRow, { backgroundColor: colors.primaryContainer, borderColor: colors.primary }]}>
+                    <Text style={[styles.confirmText, { color: colors.onPrimaryContainer }]} numberOfLines={1}>
+                        ¿Añadir "{newItem.trim()}"?
+                    </Text>
+                    <TouchableOpacity onPress={confirmAdd} style={[styles.confirmSi, { backgroundColor: colors.primary }]}>
+                        <Text style={{ color: colors.onPrimary ?? '#fff', fontSize: 13, fontWeight: '700' }}>Sí</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setConfirmando(false)} style={[styles.confirmNo, { borderColor: colors.primary }]}>
+                        <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>No</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
             {open && (
                 <Card variant="filled" style={styles.dropdown}>
                     {options.map((opt) => (
@@ -333,13 +425,13 @@ export default function AgregarParcela() {
                     <SectionTitle title="Datos Generales" colors={colors} />
                     <TextField label="Código de parcela *" value={form.codigo} onChangeText={(v) => handleChange('codigo', v)} placeholder="Ej: PAR-001-A" icon="identifier" colors={colors} />
                     <TextField label="Número de hectáreas *" value={form.hectareas} onChangeText={(v) => handleChange('hectareas', v)} placeholder="Ej: 2.5" icon="ruler-square" keyboardType="decimal-pad" colors={colors} />
-                    <PickerField label="Estado actual *" value={form.estado} options={ESTADOS} onSelect={(v) => handleChange('estado', v)} icon="list-status" colors={colors} />
+                    <PickerField label="Estado actual *" value={form.estado} options={ESTADOS} onSelect={(v) => handleChange('estado', v)} icon="list-status" colors={colors} allowAdd={false} />
                 </Card>
 
                 {/* Sección 2: Clasificación */}
                 <Card variant="elevated" style={styles.card}>
                     <SectionTitle title="Clasificación" colors={colors} />
-                    <PickerField label="Tipo de terreno *" value={form.tipo_terreno} options={TIPOS_TERRENO} onSelect={(v) => handleChange('tipo_terreno', v)} icon="terrain" colors={colors} />
+                    <PickerField label="Tipo de terreno *" value={form.tipo_terreno} options={TIPOS_TERRENO} onSelect={(v) => handleChange('tipo_terreno', v)} icon="terrain" colors={colors} storageKey="custom_tipo_terreno" />
 
                     {form.tipo_terreno ? (
                         <ZonaSelector
@@ -363,10 +455,10 @@ export default function AgregarParcela() {
                     <SectionTitle title="Características Técnicas" colors={colors} />
                     <TextField label="Ubicación (coordenadas)" value={form.ubicacion} onChangeText={(v) => handleChange('ubicacion', v)} placeholder="Ej: 4.710989, -74.072092" icon="crosshairs-gps" colors={colors} />
                     <TextField label="pH del suelo * (0 - 14)" value={form.ph_suelo} onChangeText={(v) => handleChange('ph_suelo', v)} placeholder="Ej: 6.5" icon="flask-outline" keyboardType="decimal-pad" colors={colors} />
-                    <PickerField label="Textura del suelo *" value={form.textura} options={TEXTURAS} onSelect={(v) => handleChange('textura', v)} icon="grain" colors={colors} />
-                    <PickerField label="Orientación de la ladera *" value={form.orientacion_ladera} options={ORIENTACIONES} onSelect={(v) => handleChange('orientacion_ladera', v)} icon="compass-outline" colors={colors} />
+                    <PickerField label="Textura del suelo *" value={form.textura} options={TEXTURAS} onSelect={(v) => handleChange('textura', v)} icon="grain" colors={colors} storageKey="custom_textura" />
+                    <PickerField label="Orientación de la ladera *" value={form.orientacion_ladera} options={ORIENTACIONES} onSelect={(v) => handleChange('orientacion_ladera', v)} icon="compass-outline" colors={colors} storageKey="custom_orientacion" />
                     <TextField label="Altitud (msnm) *" value={form.altitud_msnm} onChangeText={(v) => handleChange('altitud_msnm', v)} placeholder="Ej: 1850" icon="elevation-rise" keyboardType="decimal-pad" colors={colors} />
-                    <PickerField label="Cortinas rompevientos *" value={form.cortinas_rompevientos} options={CORTINAS_OPTS} onSelect={(v) => handleChange('cortinas_rompevientos', v)} icon="weather-windy" colors={colors} />
+                    <PickerField label="Cortinas rompevientos *" value={form.cortinas_rompevientos} options={CORTINAS_OPTS} onSelect={(v) => handleChange('cortinas_rompevientos', v)} icon="weather-windy" colors={colors} allowAdd={false} />
                 </Card>
             </ScrollView>
 
@@ -419,6 +511,23 @@ const styles = StyleSheet.create({
         paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, borderBottomWidth: 1,
     },
     dropdownItemText: { ...Typography.bodyMedium, flex: 1 },
+    labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm },
+    addIconBtn: { padding: 4 },
+    addNewRow: {
+        flexDirection: 'row', alignItems: 'center',
+        borderWidth: 1, borderRadius: BorderRadius.lg,
+        paddingLeft: Spacing.md, marginTop: Spacing.sm,
+    },
+    addNewInput: { flex: 1, ...Typography.bodyMedium, paddingVertical: Spacing.sm },
+    addNewConfirm: { padding: Spacing.sm, borderRadius: BorderRadius.lg, margin: 4 },
+    confirmRow: {
+        flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+        borderWidth: 1, borderRadius: BorderRadius.lg,
+        paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, marginTop: Spacing.xs,
+    },
+    confirmText: { flex: 1, fontSize: 13, fontWeight: '500' },
+    confirmSi: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md },
+    confirmNo: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1 },
     // ── Zona Selector ──
     zonaPlaceholder: {
         flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,

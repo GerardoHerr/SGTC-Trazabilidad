@@ -23,6 +23,9 @@ class Semilla(Base):
     color = Column(SqlAlchemyEnum(ColorPergamino), nullable=True)
     integridad_pergamino = Column(SqlAlchemyEnum(IntegridadPergamino), nullable=True)
     
+    # Distribuidor
+    distribuidor = Column(String, nullable=True)
+
     # Campo para el anexo
     anexo_nombre = Column(String, nullable=True)
     anexo_ruta = Column(String, nullable=True)

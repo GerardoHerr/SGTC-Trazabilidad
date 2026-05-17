@@ -12,11 +12,7 @@ interface Semilla {
     id: number;
     variedad: string;
     origen?: string;
-    metodo_secado?: string;
-    seleccion?: string;
-    olor?: string;
-    color?: string;
-    integridad_pergamino?: string;
+    distribuidor?: string;
     anexo_nombre?: string;
     anexo_tamano?: number;
     fecha_creacion?: string;
@@ -314,50 +310,13 @@ export default function Listarsemilla() {
             
                             </View>
 
-                            {/* Card Content - Info Grid */}
+                            {/* Card Content */}
                             <View style={styles.infoGrid}>
-                                {semilla.metodo_secado && (
-                                    <InfoRow
-                                        icon="fan"
-                                        label="Secado"
-                                        value={semilla.metodo_secado}
-                                    />
+                                {semilla.distribuidor && (
+                                    <InfoRow icon="truck-delivery-outline" label="Distribuidor" value={semilla.distribuidor} />
                                 )}
-                                {semilla.seleccion && (
-                                    <InfoRow
-                                        icon="filter"
-                                        label="Selección"
-                                        value={semilla.seleccion}
-                                    />
-                                )}
-                                {semilla.olor && (
-                                    <InfoRow
-                                        icon="scent"
-                                        label="Olor"
-                                        value={semilla.olor}
-                                    />
-                                )}
-                                {semilla.color && (
-                                    <InfoRow
-                                        icon="palette"
-                                        label="Color"
-                                        value={semilla.color}
-                                    />
-                                )}
-                                {semilla.integridad_pergamino && (
-                                    <InfoRow
-                                        icon="check-circle"
-                                        label="Integridad"
-                                        value={semilla.integridad_pergamino}
-                                    />
-                                )}
-                                {/* Fecha de Registro (CA-01) */}
                                 {semilla.fecha_creacion && (
-                                    <InfoRow
-                                        icon="calendar"
-                                        label="Registro"
-                                        value={formatDate(semilla.fecha_creacion)}
-                                    />
+                                    <InfoRow icon="calendar" label="Registro" value={formatDate(semilla.fecha_creacion)} />
                                 )}
                             </View>
 
