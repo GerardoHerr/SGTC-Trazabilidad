@@ -8,7 +8,7 @@ from pathlib import Path
 from database.connection import SessionLocal
 from models.semilla import Semilla
 from models.Enums import (
-    VariedadCafe, MetodoSecado,
+    MetodoSecado,
     MetodoSeleccion, OlorSemilla, ColorPergamino, IntegridadPergamino
 )
 from schemas.semilla_schema import SemillaResponse
@@ -57,10 +57,6 @@ async def crear_semilla(request: Request, db: Session = Depends(get_db)):
         if not variedad_val or not origen_val:
             raise HTTPException(status_code=400, detail="Variedad y origen son requeridos")
 
-        variedad_enum = _enum_by_value(VariedadCafe, variedad_val)
-        if variedad_enum is None:
-            raise HTTPException(status_code=400, detail=f"Variedad inválida: {variedad_val}")
-
         metodo_secado_enum = _enum_by_value(MetodoSecado, metodo_secado_val)
         seleccion_enum = _enum_by_value(MetodoSeleccion, seleccion_val)
         olor_enum = _enum_by_value(OlorSemilla, olor_val)
@@ -94,7 +90,7 @@ async def crear_semilla(request: Request, db: Session = Depends(get_db)):
             anexo_tamano = len(file_content)
 
         nueva_semilla = Semilla(
-            variedad=variedad_enum,
+            variedad=variedad_val,
             origen=origen_val,
             distribuidor=distribuidor_val,
             metodo_secado=metodo_secado_enum,

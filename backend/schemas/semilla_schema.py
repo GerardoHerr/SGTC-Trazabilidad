@@ -2,12 +2,12 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 from models.Enums import (
-    VariedadCafe, MetodoSecado, 
+    MetodoSecado,
     MetodoSeleccion, OlorSemilla, ColorPergamino, IntegridadPergamino
 )
 
 class SemillaCafeBase(BaseModel):
-    variedad: VariedadCafe
+    variedad: str
     origen: Optional[str] = None
     distribuidor: Optional[str] = None
     metodo_secado: Optional[MetodoSecado] = None

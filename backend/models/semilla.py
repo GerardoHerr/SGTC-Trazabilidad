@@ -1,19 +1,17 @@
 from sqlalchemy import Column, Integer, String, Enum as SqlAlchemyEnum, DateTime
 from datetime import datetime
 from database.connection import Base
-# Importamos los enums del archivo anterior
 from models.Enums import (
-    VariedadCafe, MetodoSecado, 
+    MetodoSecado,
     MetodoSeleccion, OlorSemilla, ColorPergamino, IntegridadPergamino
 )
 
 class Semilla(Base):
     __tablename__ = "semilla"
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    
-    # Variedad es obligatorio (nullable=False) según tu código original
-    variedad = Column(SqlAlchemyEnum(VariedadCafe), nullable=False)
+
+    variedad = Column(String, nullable=False)
     
     # Los demás atributos con sus respectivos Enums
     origen = Column(String, nullable=True)
