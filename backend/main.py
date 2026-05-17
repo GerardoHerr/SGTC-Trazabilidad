@@ -6,11 +6,13 @@ from models.semilla import Semilla
 from models.personal import Personal
 from models.parcela import Parcela
 from models.catalogo import CatalogoOpcion
+from models.lote import Lote
 
 from routes.semilla_routes import router as semilla_router
 from routes.personal_routes import router as personal_router
 from routes.parcela_routes import router as parcela_router
 from routes.catalogo_routes import router as catalogo_router
+from routes.lote_routes import router as lote_router
 
 app = FastAPI()
 
@@ -35,6 +37,7 @@ app.include_router(semilla_router)
 app.include_router(personal_router)
 app.include_router(parcela_router)
 app.include_router(catalogo_router)
+app.include_router(lote_router)
 
 @app.get("/")
 def home():

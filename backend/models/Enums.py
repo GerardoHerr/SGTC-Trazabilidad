@@ -55,6 +55,13 @@ class OlorSemilla(str, Enum):
     MOHO = "A moho"
     FERMENTO = "A fermento"
 
+# ── Lote ─────────────────────────────────────────────
+class EstadoLote(str, Enum):
+    CREADO = "Creado"
+    EN_PROCESO = "En Proceso"
+    COMPLETADO = "Completado"
+    ARCHIVADO = "Archivado"
+
 class ColorPergamino(str, Enum):
     AMARILLO_PALIDO = "Amarillo pálido uniforme"
     CREMA_CLARO = "Crema claro"

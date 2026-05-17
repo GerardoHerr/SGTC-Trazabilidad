@@ -439,6 +439,22 @@ export default function DetalleParcela() {
                     <InfoRow icon="calendar-plus" label="Fecha de registro" value={formatDate(parcela.fecha_creacion)} colors={colors} />
                     <InfoRow icon="calendar-edit" label="Última modificación" value={formatDate(parcela.fecha_modificacion)} colors={colors} />
                 </Card>
+
+                {/* Acciones - Lotes */}
+                <Card variant="elevated">
+                    <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Gestión de Lotes</Text>
+                    <Button
+                        title="Crear Lotes"
+                        onPress={() => router.push({ pathname: '/agregarLotes' as any, params: { parcelaId: parcela.id } })}
+                        variant="primary"
+                        style={{ marginBottom: Spacing.sm }}
+                    />
+                    <Button
+                        title="Ver Lotes"
+                        onPress={() => router.push({ pathname: '/ListarLotes' as any, params: { parcelaId: parcela.id } })}
+                        variant="outlined"
+                    />
+                </Card>
             </ScrollView>
 
             {editMode && (
