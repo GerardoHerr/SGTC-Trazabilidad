@@ -1,12 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+    ActivityIndicator, ScrollView, StyleSheet,
+    Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getOpciones, addOpcion } from '@/services/catalogo_service';
@@ -18,7 +13,6 @@ import { Button, Card } from '@/components';
 import { createParcela } from '@/services/parcela_service';
 
 // ── Constantes ───────────────────────────────────────────
-const ESTADOS = ['Libre', 'En Proceso', 'En Producción'];
 const TIPOS_TERRENO = ['Regular', 'Irregular'];
 const TODAS_ZONAS = ['Zona Plana', 'Zona Inclinada', 'Zona Baja', 'Zona Alta'];
 const TEXTURAS = ['Franco-arenosa', 'Franco-arcillosa'];
@@ -28,10 +22,10 @@ const CORTINAS_OPTS = ['Sí', 'No'];
 // ── Tipos ────────────────────────────────────────────────
 interface FormState {
     codigo: string;
-    hectareas: string;
-    estado: string;
+    hectareas: string;          // solo para Regular
     tipo_terreno: string;
-    tipo_zona: string[];      // 1 zona para Regular | 2-4 para Irregular
+    tipo_zona: string[];
+    zonasHectareas: Record<string, string>;  // solo para Irregular
     ubicacion: string;
     ph_suelo: string;
     textura: string;
@@ -40,7 +34,7 @@ interface FormState {
     cortinas_rompevientos: string;
 }
 
-// ── Componentes ──────────────────────────────────────────
+// ── Subcomponentes ───────────────────────────────────────
 
 function SectionTitle({ title, colors }: { title: string; colors: any }) {
     return <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>{title}</Text>;
@@ -101,10 +95,7 @@ function PickerField({
             });
     }, []);
 
-    const handleAddNew = () => {
-        if (!newItem.trim()) return;
-        setConfirmando(true);
-    };
+    const handleAddNew = () => { if (!newItem.trim()) return; setConfirmando(true); };
 
     const confirmAdd = async () => {
         const trimmed = newItem.trim();
@@ -199,67 +190,86 @@ function PickerField({
 }
 
 /**
- * Selector de zonas:
- *  - Regular  → radio buttons (selección única de 1)
- *  - Irregular → checkboxes   (selección múltiple 2-4)
+ * Selector de zonas con input de hectáreas por zona (solo Irregular)
+ * o selector de zona única (Regular)
  */
 function ZonaSelector({
-    terreno, selected, onToggle, colors,
+    terreno, selected, onToggle, zonasHectareas, onZonaHectareasChange, colors,
 }: {
     terreno: string; selected: string[];
-    onToggle: (zona: string) => void; colors: any;
+    onToggle: (zona: string) => void;
+    zonasHectareas: Record<string, string>;
+    onZonaHectareasChange: (zona: string, val: string) => void;
+    colors: any;
 }) {
     const isRegular = terreno === 'Regular';
-    const hint = isRegular
-        ? 'Selecciona exactamente 1 tipo de zona'
-        : 'Selecciona entre 2 y 4 tipos de zona';
-    const accentColor = isRegular ? colors.primary : colors.secondary;
-    const accentContainer = isRegular ? colors.primaryContainer : colors.secondaryContainer;
 
     return (
         <View style={styles.fieldContainer}>
             <Text style={[styles.label, { color: colors.onSurface }]}>
-                {isRegular ? 'Tipo de zona *' : 'Tipos de zona *'}
+                {isRegular ? 'Tipo de zona *' : 'Zonas e hectáreas *'}
             </Text>
-            <Text style={[styles.hint, { color: colors.onSurfaceVariant }]}>{hint}</Text>
+            {!isRegular && (
+                <Text style={[styles.hint, { color: colors.onSurfaceVariant }]}>
+                    Selecciona entre 2 y 4 zonas y asigna mínimo 1 ha a cada una
+                </Text>
+            )}
 
             {TODAS_ZONAS.map((zona) => {
                 const isSelected = selected.includes(zona);
                 return (
-                    <TouchableOpacity
-                        key={zona}
-                        onPress={() => onToggle(zona)}
-                        activeOpacity={0.75}
-                        style={[
-                            styles.zonaItem,
-                            {
-                                borderColor: isSelected ? accentColor : colors.outlineVariant,
-                                backgroundColor: isSelected ? accentContainer + '30' : colors.surfaceContainerLow,
-                            },
-                        ]}>
-                        {isRegular ? (
-                            /* Radio button */
-                            <View style={[styles.radio, { borderColor: isSelected ? accentColor : colors.outlineVariant }]}>
-                                {isSelected && <View style={[styles.radioFill, { backgroundColor: accentColor }]} />}
-                            </View>
-                        ) : (
-                            /* Checkbox */
-                            <View style={[
-                                styles.checkbox,
+                    <View key={zona}>
+                        <TouchableOpacity
+                            onPress={() => onToggle(zona)}
+                            activeOpacity={0.75}
+                            style={[
+                                styles.zonaItem,
                                 {
-                                    borderColor: isSelected ? accentColor : colors.outlineVariant,
-                                    backgroundColor: isSelected ? accentColor : 'transparent',
+                                    borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                                    backgroundColor: isSelected ? colors.primaryContainer + '30' : colors.surfaceContainerLow,
                                 },
                             ]}>
-                                {isSelected && <MaterialCommunityIcons name="check" size={13} color="#fff" />}
+                            {isRegular ? (
+                                <View style={[styles.radio, { borderColor: isSelected ? colors.primary : colors.outlineVariant }]}>
+                                    {isSelected && <View style={[styles.radioFill, { backgroundColor: colors.primary }]} />}
+                                </View>
+                            ) : (
+                                <View style={[
+                                    styles.checkbox,
+                                    {
+                                        borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                                        backgroundColor: isSelected ? colors.primary : 'transparent',
+                                    },
+                                ]}>
+                                    {isSelected && <MaterialCommunityIcons name="check" size={13} color="#fff" />}
+                                </View>
+                            )}
+                            <Text style={[styles.zonaText, { color: colors.onSurface }]}>{zona}</Text>
+                        </TouchableOpacity>
+
+                        {/* Input hectáreas por zona (solo Irregular cuando está seleccionada) */}
+                        {!isRegular && isSelected && (
+                            <View style={[styles.zonaHaRow, { borderColor: colors.outlineVariant, backgroundColor: colors.surfaceContainerLow }]}>
+                                <MaterialCommunityIcons name="ruler-square" size={15} color={colors.secondary} />
+                                <TextInput
+                                    style={[styles.zonaHaInput, { color: colors.onSurface }]}
+                                    placeholder="Hectáreas (mín. 1)"
+                                    placeholderTextColor={colors.onSurfaceVariant}
+                                    keyboardType="decimal-pad"
+                                    value={zonasHectareas[zona] ?? ''}
+                                    onChangeText={(v) => {
+                                        const cleaned = v.replace(/[^0-9.]/g, '');
+                                        const parts = cleaned.split('.');
+                                        onZonaHectareasChange(zona, parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : cleaned);
+                                    }}
+                                />
+                                <Text style={{ fontSize: 12, color: colors.onSurfaceVariant }}>ha</Text>
                             </View>
                         )}
-                        <Text style={[styles.zonaText, { color: colors.onSurface }]}>{zona}</Text>
-                    </TouchableOpacity>
+                    </View>
                 );
             })}
 
-            {/* Contador de selección para irregular */}
             {!isRegular && (
                 <Text style={[
                     styles.zonaCount,
@@ -281,8 +291,8 @@ export default function AgregarParcela() {
     const router = useRouter();
 
     const [form, setForm] = useState<FormState>({
-        codigo: '', hectareas: '', estado: 'Libre',
-        tipo_terreno: '', tipo_zona: [],
+        codigo: '', hectareas: '', tipo_terreno: '', tipo_zona: [],
+        zonasHectareas: {},
         ubicacion: '', ph_suelo: '', textura: '',
         orientacion_ladera: '', altitud_msnm: '', cortinas_rompevientos: '',
     });
@@ -305,7 +315,7 @@ export default function AgregarParcela() {
         }
         setForm((prev) => {
             const next = { ...prev, [field]: filtered } as FormState;
-            if (field === 'tipo_terreno') next.tipo_zona = [];
+            if (field === 'tipo_terreno') { next.tipo_zona = []; next.zonasHectareas = {}; }
             return next;
         });
         setError(null);
@@ -313,30 +323,51 @@ export default function AgregarParcela() {
 
     const handleZonaToggle = (zona: string) => {
         const isRegular = form.tipo_terreno === 'Regular';
-        setForm((prev) => ({
-            ...prev,
-            tipo_zona: isRegular
-                ? [zona]  // radio: reemplaza
+        setForm((prev) => {
+            const newZonas = isRegular
+                ? [zona]
                 : prev.tipo_zona.includes(zona)
-                    ? prev.tipo_zona.filter((z) => z !== zona)  // checkbox: deselect
-                    : [...prev.tipo_zona, zona],                 // checkbox: select
+                    ? prev.tipo_zona.filter((z) => z !== zona)
+                    : [...prev.tipo_zona, zona];
+            // Limpiar hectáreas de zonas deseleccionadas
+            const newZonasHa = { ...prev.zonasHectareas };
+            if (!newZonas.includes(zona)) delete newZonasHa[zona];
+            return { ...prev, tipo_zona: newZonas, zonasHectareas: newZonasHa };
+        });
+        setError(null);
+    };
+
+    const handleZonaHectareasChange = (zona: string, val: string) => {
+        setForm(prev => ({
+            ...prev,
+            zonasHectareas: { ...prev.zonasHectareas, [zona]: val },
         }));
         setError(null);
     };
 
+    const isIrregular = form.tipo_terreno === 'Irregular';
+
     const validateForm = (): boolean => {
         if (!form.codigo.trim()) { setError('El código de parcela es obligatorio'); return false; }
-        if (!form.hectareas.trim()) { setError('El número de hectáreas es obligatorio'); return false; }
-        const ha = parseFloat(form.hectareas);
-        if (isNaN(ha) || ha <= 0) { setError('Las hectáreas deben ser un número mayor a 0'); return false; }
         if (!form.tipo_terreno) { setError('El tipo de terreno es obligatorio'); return false; }
-        if (form.tipo_zona.length === 0) { setError('Debes seleccionar al menos un tipo de zona'); return false; }
-        if (form.tipo_terreno === 'Regular' && form.tipo_zona.length !== 1) {
-            setError('Para terreno Regular, selecciona exactamente 1 tipo de zona'); return false;
+
+        if (!isIrregular) {
+            if (!form.hectareas.trim()) { setError('El número de hectáreas es obligatorio'); return false; }
+            const ha = parseFloat(form.hectareas);
+            if (isNaN(ha) || ha < 1) { setError('Las hectáreas deben ser mínimo 1'); return false; }
+            if (form.tipo_zona.length !== 1) { setError('Para terreno Regular selecciona exactamente 1 zona'); return false; }
+        } else {
+            if (form.tipo_zona.length < 2) { setError('Para terreno Irregular selecciona al menos 2 zonas'); return false; }
+            if (form.tipo_zona.length > 4) { setError('Para terreno Irregular selecciona máximo 4 zonas'); return false; }
+            for (const zona of form.tipo_zona) {
+                const haStr = form.zonasHectareas[zona];
+                const ha = parseFloat(haStr ?? '');
+                if (!haStr || isNaN(ha) || ha < 1) {
+                    setError(`Ingresa mínimo 1 ha para: ${zona}`); return false;
+                }
+            }
         }
-        if (form.tipo_terreno === 'Irregular' && form.tipo_zona.length < 2) {
-            setError('Para terreno Irregular, selecciona al menos 2 tipos de zona'); return false;
-        }
+
         if (!form.ph_suelo.trim()) { setError('El pH del suelo es obligatorio'); return false; }
         const ph = parseFloat(form.ph_suelo);
         if (isNaN(ph) || ph < 0 || ph > 14) { setError('El pH debe estar entre 0 y 14'); return false; }
@@ -344,7 +375,7 @@ export default function AgregarParcela() {
         if (!form.orientacion_ladera) { setError('La orientación de la ladera es obligatoria'); return false; }
         if (!form.altitud_msnm.trim()) { setError('La altitud es obligatoria'); return false; }
         const alt = parseFloat(form.altitud_msnm);
-        if (isNaN(alt) || alt < 0) { setError('La altitud no puede ser un valor negativo'); return false; }
+        if (isNaN(alt) || alt < 0) { setError('La altitud no puede ser negativa'); return false; }
         if (!form.cortinas_rompevientos) { setError('Indica si existen cortinas rompevientos'); return false; }
         return true;
     };
@@ -353,10 +384,9 @@ export default function AgregarParcela() {
         if (!validateForm()) return;
         try {
             setLoading(true);
-            await createParcela({
+
+            const payload: any = {
                 codigo: form.codigo.trim(),
-                hectareas: parseFloat(form.hectareas),
-                estado: form.estado,
                 tipo_terreno: form.tipo_terreno,
                 tipo_zona: form.tipo_zona,
                 ubicacion: form.ubicacion.trim() || null,
@@ -365,7 +395,17 @@ export default function AgregarParcela() {
                 orientacion_ladera: form.orientacion_ladera,
                 altitud_msnm: parseFloat(form.altitud_msnm),
                 cortinas_rompevientos: form.cortinas_rompevientos === 'Sí',
-            });
+            };
+
+            if (isIrregular) {
+                const zonasHa: Record<string, number> = {};
+                form.tipo_zona.forEach(z => { zonasHa[z] = parseFloat(form.zonasHectareas[z]); });
+                payload.zonas_hectareas = zonasHa;
+            } else {
+                payload.hectareas = parseFloat(form.hectareas);
+            }
+
+            await createParcela(payload);
             setSuccess(true);
         } catch (err: any) {
             const detail = err?.response?.data?.detail;
@@ -411,33 +451,61 @@ export default function AgregarParcela() {
             {success && (
                 <View style={[styles.banner, { borderColor: colors.success, backgroundColor: colors.success + '15' }]}>
                     <MaterialCommunityIcons name="check-circle" size={18} color={colors.success} />
-                    <Text style={[styles.bannerText, { color: colors.success }]}>
-                        Parcela registrada con éxito
-                    </Text>
+                    <Text style={[styles.bannerText, { color: colors.success }]}>Parcela registrada con éxito</Text>
                 </View>
             )}
 
-            {/* Formulario */}
             <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
                 {/* Sección 1: Datos Generales */}
                 <Card variant="elevated" style={styles.card}>
                     <SectionTitle title="Datos Generales" colors={colors} />
-                    <TextField label="Código de parcela *" value={form.codigo} onChangeText={(v) => handleChange('codigo', v)} placeholder="Ej: PAR-001-A" icon="identifier" colors={colors} />
-                    <TextField label="Número de hectáreas *" value={form.hectareas} onChangeText={(v) => handleChange('hectareas', v)} placeholder="Ej: 2.5" icon="ruler-square" keyboardType="decimal-pad" colors={colors} />
-                    <PickerField label="Estado actual *" value={form.estado} options={ESTADOS} onSelect={(v) => handleChange('estado', v)} icon="list-status" colors={colors} allowAdd={false} />
+                    <TextField
+                        label="Código de parcela *"
+                        value={form.codigo}
+                        onChangeText={(v) => handleChange('codigo', v)}
+                        placeholder="Ej: PAR-001-A"
+                        icon="identifier"
+                        colors={colors}
+                    />
                 </Card>
 
                 {/* Sección 2: Clasificación */}
                 <Card variant="elevated" style={styles.card}>
                     <SectionTitle title="Clasificación" colors={colors} />
-                    <PickerField label="Tipo de terreno *" value={form.tipo_terreno} options={TIPOS_TERRENO} onSelect={(v) => handleChange('tipo_terreno', v)} icon="terrain" colors={colors} storageKey="custom_tipo_terreno" />
 
+                    {/* Tipo de terreno SIN botón "+" */}
+                    <PickerField
+                        label="Tipo de terreno *"
+                        value={form.tipo_terreno}
+                        options={TIPOS_TERRENO}
+                        onSelect={(v) => handleChange('tipo_terreno', v)}
+                        icon="terrain"
+                        colors={colors}
+                        allowAdd={false}
+                    />
+
+                    {/* Hectáreas — solo para Regular, debajo del tipo de terreno */}
+                    {form.tipo_terreno === 'Regular' && (
+                        <TextField
+                            label="Número de hectáreas *"
+                            value={form.hectareas}
+                            onChangeText={(v) => handleChange('hectareas', v)}
+                            placeholder="Ej: 2.5 (mín. 1)"
+                            icon="ruler-square"
+                            keyboardType="decimal-pad"
+                            colors={colors}
+                        />
+                    )}
+
+                    {/* Zonas */}
                     {form.tipo_terreno ? (
                         <ZonaSelector
                             terreno={form.tipo_terreno}
                             selected={form.tipo_zona}
                             onToggle={handleZonaToggle}
+                            zonasHectareas={form.zonasHectareas}
+                            onZonaHectareasChange={handleZonaHectareasChange}
                             colors={colors}
                         />
                     ) : (
@@ -445,6 +513,16 @@ export default function AgregarParcela() {
                             <MaterialCommunityIcons name="information-outline" size={16} color={colors.onSurfaceVariant} />
                             <Text style={[styles.hint, { color: colors.onSurfaceVariant, marginBottom: 0 }]}>
                                 Selecciona primero el tipo de terreno
+                            </Text>
+                        </View>
+                    )}
+
+                    {/* Resumen hectáreas para irregular */}
+                    {isIrregular && form.tipo_zona.length >= 2 && (
+                        <View style={[styles.resumenHa, { backgroundColor: colors.primaryContainer + '30', borderColor: colors.primary + '50' }]}>
+                            <MaterialCommunityIcons name="sigma" size={16} color={colors.primary} />
+                            <Text style={[styles.resumenHaText, { color: colors.primary }]}>
+                                Total: {form.tipo_zona.reduce((sum, z) => sum + (parseFloat(form.zonasHectareas[z] ?? '0') || 0), 0).toFixed(2)} ha
                             </Text>
                         </View>
                     )}
@@ -528,7 +606,6 @@ const styles = StyleSheet.create({
     confirmText: { flex: 1, fontSize: 13, fontWeight: '500' },
     confirmSi: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md },
     confirmNo: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1 },
-    // ── Zona Selector ──
     zonaPlaceholder: {
         flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
         borderWidth: 1, borderStyle: 'dashed', borderRadius: BorderRadius.lg,
@@ -538,7 +615,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
         borderWidth: 1.5, borderRadius: BorderRadius.md,
         paddingHorizontal: Spacing.md, paddingVertical: Spacing.md,
-        marginBottom: Spacing.sm,
+        marginBottom: Spacing.xs,
     },
     radio: {
         width: 20, height: 20, borderRadius: BorderRadius.full,
@@ -551,6 +628,20 @@ const styles = StyleSheet.create({
     },
     zonaText: { ...Typography.bodyMedium, flex: 1 },
     zonaCount: { ...Typography.labelSmall, fontWeight: '500', marginTop: Spacing.xs },
+    zonaHaRow: {
+        flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+        borderWidth: 1, borderRadius: BorderRadius.md,
+        paddingHorizontal: Spacing.md, paddingVertical: 8,
+        marginBottom: Spacing.sm, marginLeft: 36,
+    },
+    zonaHaInput: { flex: 1, fontSize: 14 },
+    resumenHa: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        borderWidth: 1, borderRadius: BorderRadius.md,
+        paddingHorizontal: Spacing.md, paddingVertical: 8,
+        marginTop: Spacing.xs,
+    },
+    resumenHaText: { fontSize: 14, fontWeight: '700' },
     footer: {
         flexDirection: 'row', gap: Spacing.md,
         paddingHorizontal: Spacing.lg, paddingVertical: Spacing.lg, borderTopWidth: 1,

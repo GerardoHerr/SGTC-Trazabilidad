@@ -118,9 +118,9 @@ def listar_lotes(
     if estado:
         query = query.filter(Lote.estado == estado)
     else:
-        # Por defecto, mostrar lotes activos (Creado o En Proceso)
+        # Por defecto, mostrar lotes activos (excluye solo Completado y Archivado)
         query = query.filter(
-            Lote.estado.in_([EstadoLote.CREADO, EstadoLote.EN_PROCESO])
+            Lote.estado.in_([EstadoLote.CREADO, EstadoLote.EN_PROCESO, EstadoLote.EN_PRODUCCION])
         )
     
     lotes = query.order_by(Lote.fecha_creacion.desc()).all()

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getOpciones, addOpcion } from '@/services/catalogo_service';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -17,6 +17,7 @@ const ALLOWED_EXTENSIONS = ['.pdf', '.csv', '.jpg', '.jpeg', '.png'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 const VARIEDADES_INICIALES = ['Caturra', 'Castillo', 'Geisha', 'Bourbon', 'Típica'];
+const DISTRIBUIDORES_INICIALES = ['Almacafé S.A.', 'FNC', 'Agroinsumos del Sur', 'Semillas Andinas'];
 
 interface FormState {
     variedad: string;
@@ -175,6 +176,8 @@ export default function AgregarSemilla() {
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'light'];
     const router = useRouter();
+    const { returnToLoteId } = useLocalSearchParams();
+    const loteIdRetorno = Array.isArray(returnToLoteId) ? returnToLoteId[0] : returnToLoteId ?? null;
 
     const [form, setForm] = useState<FormState>({ variedad: '', origen: '', distribuidor: '' });
     const [loading, setLoading] = useState(false);
@@ -213,7 +216,13 @@ export default function AgregarSemilla() {
 
     useEffect(() => {
         if (success) {
-            const t = setTimeout(() => router.push('/Listarsemilla'), 1800);
+            const t = setTimeout(() => {
+                if (loteIdRetorno) {
+                    router.replace({ pathname: '/lote/[id]' as any, params: { id: loteIdRetorno } });
+                } else {
+                    router.push('/Listarsemilla');
+                }
+            }, 1800);
             return () => clearTimeout(t);
         }
     }, [success]);
@@ -299,19 +308,15 @@ export default function AgregarSemilla() {
                         </View>
                     </View>
 
-                    <View style={styles.fieldContainer}>
-                        <Text style={[styles.label, { color: colors.onSurface }]}>Distribuidor</Text>
-                        <View style={[styles.inputRow, { borderColor: colors.outlineVariant, backgroundColor: colors.surfaceContainerLow }]}>
-                            <MaterialCommunityIcons name="truck-delivery-outline" size={18} color={colors.secondary} />
-                            <TextInput
-                                style={[styles.textInput, { color: colors.onSurface }]}
-                                placeholder="Ej: Almacafé S.A."
-                                placeholderTextColor={colors.onSurfaceVariant}
-                                value={form.distribuidor}
-                                onChangeText={(v) => handleChange('distribuidor', v)}
-                            />
-                        </View>
-                    </View>
+                    <PickerField
+                        label="Distribuidor"
+                        value={form.distribuidor}
+                        options={DISTRIBUIDORES_INICIALES}
+                        onSelect={(v) => handleChange('distribuidor', v)}
+                        icon="truck-delivery-outline"
+                        colors={colors}
+                        storageKey="custom_distribuidor"
+                    />
                 </Card>
 
                 {/* Anexo */}

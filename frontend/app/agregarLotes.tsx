@@ -1,475 +1,336 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  TextInput,
-  TouchableOpacity,
+    ActivityIndicator, ScrollView, StyleSheet,
+    Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { BorderRadius, Colors, Spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Button, Card } from '@/components';
-import { getParcelaById as obtenerParcela } from '@/services/parcela_service';
+import { getParcelaById } from '@/services/parcela_service';
 import { crearLotes, listarLotes } from '@/services/lote_service';
-import { getSemillas } from '@/services/semilla_service';
 
-const AgregarLotes = () => {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-  const router = useRouter();
-  const { parcelaId } = useLocalSearchParams();
+export default function AgregarLotes() {
+    const cs = useColorScheme();
+    const c = Colors[cs ?? 'light'];
+    const router = useRouter();
+    const { parcelaId: parcelaIdParam } = useLocalSearchParams();
+    const parcelaId = Array.isArray(parcelaIdParam) ? parcelaIdParam[0] : parcelaIdParam ?? '';
 
-  const [parcela, setParcela] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [cantidadLotes, setCantidadLotes] = useState('1');
-  const [distribuciones, setDistribuciones] = useState([]);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [semillas, setSemillas] = useState([]);
-  const [saving, setSaving] = useState(false);
-  const [hectareasUsadas, setHectareasUsadas] = useState(0);
-  const [validacionMsg, setValidacionMsg] = useState('');
+    const [parcela, setParcela] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [hectareasUsadas, setHectareasUsadas] = useState(0);
 
-  useEffect(() => {
-    cargarDatos();
-  }, []);
+    // Para parcelas REGULARES
+    const [cantidadLotes, setCantidadLotes] = useState('1');
+    const [distribuciones, setDistribuciones] = useState<any[]>([]);
 
-  const cargarDatos = async () => {
-    try {
-      // Cargar parcela
-      const dataParcela = await obtenerParcela(parcelaId);
-      setParcela(dataParcela);
+    useEffect(() => { cargarDatos(); }, []);
 
-      // Cargar lotes existentes para calcular hectáreas usadas
-      const lotesExistentes = await listarLotes(parcelaId);
-      const usadas = lotesExistentes.reduce((sum, lote) => sum + (lote.hectareas_asignadas || 0), 0);
-      setHectareasUsadas(usadas);
+    const cargarDatos = async () => {
+        try {
+            const [dataParcela, lotesExistentes] = await Promise.all([
+                getParcelaById(parseInt(parcelaId as string)),
+                (listarLotes as any)(parseInt(parcelaId)),
+            ]);
+            setParcela(dataParcela);
+            const usadas = lotesExistentes.reduce((sum: number, l: any) => sum + (l.hectareas_asignadas || 0), 0);
+            setHectareasUsadas(usadas);
 
-      // Cargar semillas
-      const dataSemillas = await getSemillas();
-      setSemillas(dataSemillas);
-
-      setLoading(false);
-    } catch (err) {
-      setError('Error al cargar los datos');
-      setLoading(false);
-    }
-  };
-
-  const calcularDistribucion = (cantidad) => {
-    if (!parcela || cantidad < 1) {
-      setDistribuciones([]);
-      return;
-    }
-
-    const hectareasPromedio = parcela.hectareas / cantidad;
-    const nuevasDistribuciones = Array.from({ length: cantidad }, (_, i) => ({
-      numero_lote: i + 1,
-      hectareas: Math.round((hectareasPromedio + Number.EPSILON) * 100) / 100,
-      tipo_zona: null,
-    }));
-
-    setDistribuciones(nuevasDistribuciones);
-  };
-
-  const handleCantidadChange = (text) => {
-    const num = parseInt(text) || 0;
-    setCantidadLotes(text);
-    if (num > 0) {
-      calcularDistribucion(num);
-    }
-  };
-
-  const handleHectareasChange = (index, valor) => {
-    const nuevas = [...distribuciones];
-    nuevas[index].hectareas = parseFloat(valor) || 0;
-    setDistribuciones(nuevas);
-  };
-
-  const handleTipoZonaChange = (index, tipoZona) => {
-    const nuevas = [...distribuciones];
-    nuevas[index].tipo_zona = tipoZona;
-    setDistribuciones(nuevas);
-  };
-
-  const validarDistribucion = () => {
-    setValidacionMsg('');
-    
-    // Validar que cantidad sea > 0
-    const cantidad = parseInt(cantidadLotes);
-    if (cantidad < 1) {
-      setError('La cantidad de lotes debe ser mayor a 0');
-      return false;
-    }
-
-    if (distribuciones.length !== cantidad) {
-      setError('Error en la cantidad de distribuciones');
-      return false;
-    }
-
-    // Validar suma de hectáreas
-    const totalHectareas = distribuciones.reduce((sum, d) => sum + d.hectareas, 0);
-    const hectareasDisponibles = parcela.hectareas - hectareasUsadas;
-    
-    if (totalHectareas > hectareasDisponibles) {
-      setError(
-        `La suma de hectáreas (${totalHectareas}) no puede exceder el espacio disponible (${hectareasDisponibles.toFixed(2)} ha)`
-      );
-      return false;
-    }
-
-    // Para parcelas irregulares, validar tipo_zona
-    if (parcela.tipo_terreno === 'Irregular') {
-      for (let i = 0; i < distribuciones.length; i++) {
-        if (!distribuciones[i].tipo_zona) {
-          setError(`Debe especificar el tipo de zona para el lote ${i + 1}`);
-          return false;
+            // Si es irregular, auto-generar distribuciones desde zonas_hectareas
+            if (dataParcela.tipo_terreno === 'Irregular' && dataParcela.zonas_hectareas) {
+                const dist = Object.entries(dataParcela.zonas_hectareas).map(([zona, ha], i) => ({
+                    numero_lote: i + 1,
+                    hectareas: ha as number,
+                    tipo_zona: zona,
+                }));
+                setDistribuciones(dist);
+            } else {
+                calcularDistribucionRegular(dataParcela, 1);
+            }
+        } catch {
+            setError('Error al cargar los datos de la parcela.');
+        } finally {
+            setLoading(false);
         }
-      }
-    }
+    };
 
-    return true;
-  };
+    const calcularDistribucionRegular = (p: any, cantidad: number) => {
+        if (!p || cantidad < 1) { setDistribuciones([]); return; }
+        const disponibles = p.hectareas - hectareasUsadas;
+        const ha = Math.max(0, Math.round((disponibles / cantidad + Number.EPSILON) * 100) / 100);
+        setDistribuciones(
+            Array.from({ length: cantidad }, (_, i) => ({
+                numero_lote: i + 1,
+                hectareas: ha,
+                tipo_zona: null,
+            }))
+        );
+    };
 
-  const handleGuardar = async () => {
-    setError('');
-    setSuccess('');
+    const handleCantidadChange = (text: string) => {
+        setCantidadLotes(text);
+        const n = parseInt(text) || 0;
+        if (n > 0 && parcela) calcularDistribucionRegular(parcela, n);
+        else setDistribuciones([]);
+    };
 
-    if (!validarDistribucion()) {
-      return;
-    }
+    const handleHectareasChange = (index: number, valor: string) => {
+        const nuevas = [...distribuciones];
+        nuevas[index] = { ...nuevas[index], hectareas: parseFloat(valor) || 0 };
+        setDistribuciones(nuevas);
+    };
 
-    setSaving(true);
-    try {
-      const lotesData = {
-        parcela_id: parseInt(parcelaId),
-        cantidad_lotes: parseInt(cantidadLotes),
-        distribuciones: distribuciones,
-      };
+    const validar = (): boolean => {
+        setError('');
+        if (distribuciones.length === 0) { setError('No hay lotes para crear.'); return false; }
+        const totalHa = distribuciones.reduce((s, d) => s + d.hectareas, 0);
+        const disponibles = parcela.hectareas - hectareasUsadas;
+        if (totalHa > disponibles + 0.001) {
+            setError(`Las hectáreas (${totalHa.toFixed(2)}) superan el espacio disponible (${disponibles.toFixed(2)} ha).`);
+            return false;
+        }
+        if (parcela.tipo_terreno === 'Regular') {
+            const n = parseInt(cantidadLotes);
+            if (n < 1) { setError('La cantidad de lotes debe ser mayor a 0.'); return false; }
+        }
+        return true;
+    };
 
-      await crearLotes(lotesData);
-      setSuccess('✓ Lotes creados exitosamente');
-      setTimeout(() => {
-        router.push({
-          pathname: '/ListarLotes' as any,
-          params: { parcelaId },
-        });
-      }, 1500);
-    } catch (err) {
-      const mensaje =
-        err.response?.data?.detail || 'Error al crear los lotes';
-      setError(mensaje);
-    } finally {
-      setSaving(false);
-    }
-  };
+    const handleGuardar = async () => {
+        if (!validar()) return;
+        setSaving(true);
+        try {
+            await crearLotes({
+                parcela_id: parseInt(parcelaId as string),
+                cantidad_lotes: distribuciones.length,
+                distribuciones,
+            });
+            setSuccess('Lotes creados correctamente');
+            setTimeout(() => router.back(), 1500);
+        } catch (err: any) {
+            setError(err?.response?.data?.detail ?? 'Error al crear los lotes.');
+        } finally {
+            setSaving(false);
+        }
+    };
 
-  if (loading) {
-    return (
-      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </ThemedView>
-    );
-  }
-
-  if (!parcela) {
-    return (
-      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ThemedText type="subtitle">Parcela no encontrada</ThemedText>
-      </ThemedView>
-    );
-  }
-
-  const tiposZona = ['Zona Plana', 'Zona Inclinada', 'Zona Baja', 'Zona Alta'];
-
-  return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      contentContainerStyle={{ padding: 16 }}
-    >
-      <ThemedView style={{ marginBottom: 24 }}>
-        <ThemedText type="title" style={{ marginBottom: 8 }}>
-          Crear Lotes
-        </ThemedText>
-        <ThemedText type="subtitle">
-          Parcela {parcela.codigo} ({parcela.hectareas} hectáreas)
-        </ThemedText>
-        {hectareasUsadas > 0 && (
-          <ThemedText style={{ marginTop: 4, fontSize: 12, color: colors.textSecondary }}>
-            Disponibles: {(parcela.hectareas - hectareasUsadas).toFixed(2)} ha ({hectareasUsadas.toFixed(2)} ha ya usadas)
-          </ThemedText>
-        )}
-      </ThemedView>
-
-      {/* Cantidad de Lotes */}
-      <Card style={{ marginBottom: 16 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-          <MaterialCommunityIcons name="numeric" size={18} color={colors.primary} style={{ marginRight: 8 }} />
-          <ThemedText type="subtitle">Cantidad de Lotes</ThemedText>
-        </View>
-        <TextInput
-          placeholder="Ej: 3"
-          keyboardType="numeric"
-          value={cantidadLotes}
-          onChangeText={handleCantidadChange}
-          style={{
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 8,
-            padding: 12,
-            fontSize: 16,
-            color: colors.text,
-            backgroundColor: colors.surfaceContainerLow,
-          }}
-          placeholderTextColor={colors.textSecondary}
-        />
-      </Card>
-
-      {/* Información de tipo de parcela */}
-      {parcela.tipo_terreno && (
-        <Card
-          style={{
-            marginBottom: 16,
-            backgroundColor: colors.surfaceContainerLow,
-          }}
-        >
-          <ThemedText type="subtitle">
-            Tipo de Terreno: {parcela.tipo_terreno}
-          </ThemedText>
-          {parcela.tipo_terreno === 'Irregular' && (
-            <ThemedText style={{ color: colors.textSecondary, marginTop: 4 }}>
-              ℹ Deberá seleccionar el tipo de zona para cada lote
-            </ThemedText>
-          )}
-        </Card>
-      )}
-
-      {/* Distribución de Lotes */}
-      {distribuciones.length > 0 && (
-        <ThemedView>
-          <ThemedText
-            type="subtitle"
-            style={{ marginBottom: 12, marginTop: 8 }}
-          >
-            Distribución de Hectáreas
-          </ThemedText>
-
-          {distribuciones.map((dist, index) => (
-            <Card key={index} style={{ marginBottom: 12 }}>
-              <ThemedText type="subtitle" style={{ marginBottom: 12 }}>
-                Lote {dist.numero_lote}
-              </ThemedText>
-
-              {/* Hectáreas */}
-              <ThemedText style={{ marginBottom: 4, fontSize: 12 }}>
-                Hectáreas
-              </ThemedText>
-              <TextInput
-                placeholder="Hectáreas"
-                keyboardType="decimal-pad"
-                value={dist.hectareas.toString()}
-                onChangeText={(val) => handleHectareasChange(index, val)}
-                style={{
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: 8,
-                  padding: 10,
-                  fontSize: 16,
-                  color: colors.text,
-                  backgroundColor: colors.surfaceContainerLow,
-                  marginBottom: 12,
-                }}
-                placeholderTextColor={colors.textSecondary}
-              />
-
-              {/* Tipo de Zona (solo para irregulares) */}
-              {parcela.tipo_terreno === 'Irregular' && (
-                <View>
-                  <ThemedText style={{ marginBottom: 8, fontSize: 12 }}>
-                    Tipo de Zona
-                  </ThemedText>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      flexWrap: 'wrap',
-                      gap: 8,
-                      marginBottom: 8,
-                    }}
-                  >
-                    {tiposZona.map((tipo) => (
-                      <TouchableOpacity
-                        key={tipo}
-                        onPress={() =>
-                          handleTipoZonaChange(
-                            index,
-                            dist.tipo_zona === tipo ? null : tipo
-                          )
-                        }
-                        style={{
-                          paddingHorizontal: 12,
-                          paddingVertical: 8,
-                          borderRadius: 8,
-                          backgroundColor:
-                            dist.tipo_zona === tipo
-                              ? colors.primary
-                              : colors.surfaceContainerLow,
-                          borderWidth: 1,
-                          borderColor:
-                            dist.tipo_zona === tipo
-                              ? colors.primary
-                              : colors.border,
-                        }}
-                      >
-                        <ThemedText
-                          style={{
-                            fontSize: 12,
-                            color:
-                              dist.tipo_zona === tipo
-                                ? '#fff'
-                                : colors.text,
-                          }}
-                        >
-                          {tipo.split(' ')[1]}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-            </Card>
-          ))}
-
-          {/* Resumen */}
-          <Card
-            style={{
-              marginBottom: 16,
-              backgroundColor: colors.surfaceContainer,
-              marginTop: 16,
-            }}
-          >
-            <ThemedText type="subtitle" style={{ marginBottom: 8 }}>
-              Resumen
-            </ThemedText>
-            <ThemedText>
-              Hectáreas totales de parcela: {parcela.hectareas}
-            </ThemedText>
-            <ThemedText style={{ marginTop: 4 }}>
-              Hectáreas ya usadas: {hectareasUsadas.toFixed(2)}
-            </ThemedText>
-            <ThemedText style={{ marginTop: 4, marginBottom: 8 }}>
-              Hectáreas disponibles:{' '}
-              {(parcela.hectareas - hectareasUsadas).toFixed(2)}
-            </ThemedText>
-            
-            <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8, marginTop: 8 }}>
-              <ThemedText style={{ marginTop: 4 }}>
-                Nuevas hectáreas a asignar:{' '}
-                {distribuciones.reduce((sum, d) => sum + d.hectareas, 0).toFixed(2)}
-              </ThemedText>
-              <ThemedText style={{ marginTop: 4 }}>
-                Hectáreas después de crear:{' '}
-                {(
-                  parcela.hectareas -
-                  hectareasUsadas -
-                  distribuciones.reduce((sum, d) => sum + d.hectareas, 0)
-                ).toFixed(2)}
-              </ThemedText>
-
-              {distribuciones.length > 0 && (
-                parcela.hectareas - hectareasUsadas - distribuciones.reduce((sum, d) => sum + d.hectareas, 0) < 0 ? (
-                  <View style={{ marginTop: 12, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.error + '20', borderRadius: 8, borderWidth: 1, borderColor: colors.error }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                      <MaterialCommunityIcons name="alert" size={18} color={colors.error} style={{ marginRight: 8, marginTop: 2 }} />
-                      <ThemedText style={{ color: colors.error, flex: 1 }}>
-                        ⚠ Excedes el espacio disponible por {Math.abs(parcela.hectareas - hectareasUsadas - distribuciones.reduce((sum, d) => sum + d.hectareas, 0)).toFixed(2)} ha
-                      </ThemedText>
-                    </View>
-                  </View>
-                ) : (
-                  <View style={{ marginTop: 12, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.success + '20', borderRadius: 8, borderWidth: 1, borderColor: colors.success }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <MaterialCommunityIcons name="check-circle" size={18} color={colors.success} style={{ marginRight: 8 }} />
-                      <ThemedText style={{ color: colors.success, flex: 1 }}>
-                        ✓ Distribución válida
-                      </ThemedText>
-                    </View>
-                  </View>
-                )
-              )}
+    if (loading) {
+        return (
+            <View style={[st.center, { backgroundColor: c.surface }]}>
+                <ActivityIndicator size="large" color={c.primary} />
             </View>
-          </Card>
-        </ThemedView>
-      )}
+        );
+    }
 
-      {/* Botones */}
-      {error && (
-        <Card
-          style={{
-            marginBottom: 16,
-            backgroundColor: colors.error + '20',
-            borderColor: colors.error,
-            borderWidth: 1,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <MaterialCommunityIcons
-              name="alert-circle"
-              size={20}
-              color={colors.error}
-              style={{ marginRight: 8 }}
-            />
-            <ThemedText style={{ color: colors.error, flex: 1 }}>
-              {error}
-            </ThemedText>
-          </View>
-        </Card>
-      )}
+    if (!parcela) {
+        return (
+            <View style={[st.center, { backgroundColor: c.surface }]}>
+                <Text style={{ color: c.error }}>Parcela no encontrada.</Text>
+            </View>
+        );
+    }
 
-      {success && (
-        <Card
-          style={{
-            marginBottom: 16,
-            backgroundColor: colors.success + '20',
-            borderColor: colors.success,
-            borderWidth: 1,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <MaterialCommunityIcons
-              name="check-circle"
-              size={20}
-              color={colors.success}
-              style={{ marginRight: 8 }}
-            />
-            <ThemedText style={{ color: colors.success }}>
-              {success}
-            </ThemedText>
-          </View>
-        </Card>
-      )}
+    const isIrregular = parcela.tipo_terreno === 'Irregular';
+    const disponibles = parcela.hectareas - hectareasUsadas;
+    const totalNuevo = distribuciones.reduce((s, d) => s + d.hectareas, 0);
 
-      <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-        <Button
-          title="Cancelar"
-          onPress={() => router.back()}
-          variant="outlined"
-          style={{ flex: 1 }}
-        />
-        <Button
-          title="Guardar"
-          onPress={handleGuardar}
-          loading={saving}
-          disabled={distribuciones.length === 0 || saving}
-          style={{ flex: 1 }}
-        />
-      </View>
-    </ScrollView>
-  );
-};
+    return (
+        <View style={[st.container, { backgroundColor: c.background }]}>
+            {/* Header */}
+            <View style={[st.header, { borderBottomColor: c.outlineVariant, backgroundColor: c.surface }]}>
+                <TouchableOpacity onPress={() => router.back()} style={st.backBtn}>
+                    <MaterialCommunityIcons name="arrow-left" size={24} color={c.primary} />
+                </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                    <Text style={[st.title, { color: c.onSurface }]}>Crear Lotes</Text>
+                    <Text style={[st.sub, { color: c.onSurfaceVariant }]}>
+                        Parcela {parcela.codigo} · {parcela.tipo_terreno}
+                    </Text>
+                </View>
+            </View>
 
-export default AgregarLotes;
+            <ScrollView contentContainerStyle={st.scroll}>
+                {/* Banners */}
+                {error !== '' && (
+                    <View style={[st.banner, { borderColor: c.error, backgroundColor: c.error + '15' }]}>
+                        <MaterialCommunityIcons name="alert-circle" size={16} color={c.error} />
+                        <Text style={{ flex: 1, color: c.error, fontSize: 13 }}>{error}</Text>
+                    </View>
+                )}
+                {success !== '' && (
+                    <View style={[st.banner, { borderColor: c.success, backgroundColor: c.success + '15' }]}>
+                        <MaterialCommunityIcons name="check-circle" size={16} color={c.success} />
+                        <Text style={{ flex: 1, color: c.success, fontSize: 13 }}>{success}</Text>
+                    </View>
+                )}
+
+                {/* Disponibilidad */}
+                <Card variant="elevated" style={st.card}>
+                    <Text style={[st.sectionTitle, { color: c.onSurface }]}>Espacio disponible</Text>
+                    <View style={st.haRow}>
+                        <View style={st.haCell}>
+                            <Text style={[st.haNum, { color: c.primary }]}>{parcela.hectareas} ha</Text>
+                            <Text style={[st.haLbl, { color: c.onSurfaceVariant }]}>Total parcela</Text>
+                        </View>
+                        <View style={st.haCell}>
+                            <Text style={[st.haNum, { color: c.error }]}>{hectareasUsadas.toFixed(2)} ha</Text>
+                            <Text style={[st.haLbl, { color: c.onSurfaceVariant }]}>Ocupadas</Text>
+                        </View>
+                        <View style={st.haCell}>
+                            <Text style={[st.haNum, { color: c.success }]}>{disponibles.toFixed(2)} ha</Text>
+                            <Text style={[st.haLbl, { color: c.onSurfaceVariant }]}>Disponibles</Text>
+                        </View>
+                    </View>
+                </Card>
+
+                {/* REGULAR: input cantidad + distribución editable */}
+                {!isIrregular && (
+                    <Card variant="elevated" style={st.card}>
+                        <Text style={[st.sectionTitle, { color: c.onSurface }]}>Cantidad de lotes</Text>
+                        <View style={[st.inputRow, { borderColor: c.outlineVariant, backgroundColor: c.surfaceContainerLow }]}>
+                            <MaterialCommunityIcons name="numeric" size={17} color={c.secondary} />
+                            <TextInput
+                                style={[{ flex: 1, fontSize: 15, color: c.onSurface }]}
+                                placeholder="Ej: 3"
+                                keyboardType="numeric"
+                                value={cantidadLotes}
+                                onChangeText={handleCantidadChange}
+                                placeholderTextColor={c.onSurfaceVariant}
+                            />
+                        </View>
+                    </Card>
+                )}
+
+                {/* IRREGULAR: info de auto-distribución */}
+                {isIrregular && (
+                    <Card variant="elevated" style={st.card}>
+                        <View style={st.infoRow}>
+                            <MaterialCommunityIcons name="information-outline" size={16} color={c.primary} />
+                            <Text style={[st.infoText, { color: c.onSurface }]}>
+                                Se creará un lote por cada zona registrada en la parcela. Las hectáreas ya están definidas.
+                            </Text>
+                        </View>
+                    </Card>
+                )}
+
+                {/* Distribución */}
+                {distribuciones.length > 0 && (
+                    <Card variant="elevated" style={st.card}>
+                        <Text style={[st.sectionTitle, { color: c.onSurface }]}>
+                            {isIrregular ? 'Lotes a crear' : 'Distribución de hectáreas'}
+                        </Text>
+                        {distribuciones.map((dist, idx) => (
+                            <View key={idx} style={[st.loteRow, { borderColor: c.outlineVariant }]}>
+                                <View style={[st.loteNum, { backgroundColor: c.primaryContainer }]}>
+                                    <Text style={[st.loteNumText, { color: c.primary }]}>{idx + 1}</Text>
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    {dist.tipo_zona && (
+                                        <Text style={[st.zonaTag, { color: c.secondary }]}>{dist.tipo_zona}</Text>
+                                    )}
+                                    {isIrregular ? (
+                                        <Text style={[st.haFixed, { color: c.onSurface }]}>{dist.hectareas} ha</Text>
+                                    ) : (
+                                        <View style={[st.haInputRow, { borderColor: c.outlineVariant, backgroundColor: c.surfaceContainerLow }]}>
+                                            <TextInput
+                                                style={{ flex: 1, fontSize: 14, color: c.onSurface }}
+                                                keyboardType="decimal-pad"
+                                                value={dist.hectareas.toString()}
+                                                onChangeText={(v) => handleHectareasChange(idx, v)}
+                                                placeholderTextColor={c.onSurfaceVariant}
+                                            />
+                                            <Text style={{ fontSize: 12, color: c.onSurfaceVariant }}>ha</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+                        ))}
+
+                        {/* Resumen */}
+                        <View style={[st.resumen, { borderTopColor: c.outlineVariant }]}>
+                            <Text style={[st.resumenLabel, { color: c.onSurfaceVariant }]}>Nuevo total asignado:</Text>
+                            <Text style={[st.resumenVal, {
+                                color: totalNuevo > disponibles + 0.001 ? c.error : c.success,
+                            }]}>
+                                {totalNuevo.toFixed(2)} / {disponibles.toFixed(2)} ha
+                            </Text>
+                        </View>
+                    </Card>
+                )}
+
+                <View style={{ height: 24 }} />
+            </ScrollView>
+
+            {/* Footer */}
+            <View style={[st.footer, { borderTopColor: c.outlineVariant, backgroundColor: c.surface }]}>
+                <Button title="Cancelar" onPress={() => router.back()} variant="outlined" style={{ flex: 1 }} disabled={saving} />
+                <Button
+                    title={saving ? 'Guardando...' : 'Crear Lotes'}
+                    onPress={handleGuardar}
+                    variant="primary"
+                    style={{ flex: 1 }}
+                    disabled={saving || distribuciones.length === 0}
+                />
+            </View>
+        </View>
+    );
+}
+
+const st = StyleSheet.create({
+    container: { flex: 1 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    header: {
+        flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+        paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderBottomWidth: 1,
+    },
+    backBtn: { padding: Spacing.xs },
+    title: { fontSize: 18, fontWeight: '700' },
+    sub: { fontSize: 12 },
+    scroll: { padding: Spacing.md, gap: Spacing.md },
+    card: { marginBottom: 0 },
+    sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: Spacing.md },
+    banner: {
+        flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+        borderWidth: 1, borderRadius: BorderRadius.md, padding: Spacing.sm,
+    },
+    haRow: { flexDirection: 'row', justifyContent: 'space-around' },
+    haCell: { alignItems: 'center' },
+    haNum: { fontSize: 18, fontWeight: '700' },
+    haLbl: { fontSize: 11 },
+    inputRow: {
+        flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+        borderWidth: 1, borderRadius: BorderRadius.md,
+        paddingHorizontal: Spacing.md, paddingVertical: Spacing.md,
+    },
+    infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    infoText: { flex: 1, fontSize: 13 },
+    loteRow: {
+        flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+        borderWidth: 1, borderRadius: BorderRadius.md,
+        padding: Spacing.sm, marginBottom: Spacing.sm,
+    },
+    loteNum: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+    loteNumText: { fontSize: 13, fontWeight: '700' },
+    zonaTag: { fontSize: 12, fontWeight: '600', marginBottom: 4 },
+    haFixed: { fontSize: 15, fontWeight: '600' },
+    haInputRow: {
+        flexDirection: 'row', alignItems: 'center',
+        borderWidth: 1, borderRadius: BorderRadius.md,
+        paddingHorizontal: Spacing.sm, paddingVertical: 6,
+    },
+    resumen: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        borderTopWidth: 1, paddingTop: Spacing.sm, marginTop: Spacing.sm,
+    },
+    resumenLabel: { fontSize: 13 },
+    resumenVal: { fontSize: 14, fontWeight: '700' },
+    footer: {
+        flexDirection: 'row', gap: Spacing.md,
+        paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, borderTopWidth: 1,
+    },
+});

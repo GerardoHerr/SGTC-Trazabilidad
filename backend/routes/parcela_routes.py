@@ -55,7 +55,9 @@ def crear_parcela(datos: ParcelaCreate, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=400, detail="El código de parcela ya está registrado"
         )
-    parcela = Parcela(**datos.model_dump())
+    data = datos.model_dump()
+    data['estado'] = EstadoParcela.LIBRE  # siempre inicia como Libre
+    parcela = Parcela(**data)
     db.add(parcela)
     db.commit()
     db.refresh(parcela)

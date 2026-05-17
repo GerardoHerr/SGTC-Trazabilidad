@@ -31,6 +31,7 @@ class RolTrabajador(str, Enum):
     OPERARIO = "Operario"
     SUPERVISOR = "Supervisor"
     CAPATAZ = "Capataz"
+    AGRICULTOR = "Agricultor"
 
 # ── Semilla ─────────────────────────────────────────────
 class VariedadCafe(str, Enum):
@@ -59,8 +60,25 @@ class OlorSemilla(str, Enum):
 class EstadoLote(str, Enum):
     CREADO = "Creado"
     EN_PROCESO = "En Proceso"
+    EN_PRODUCCION = "En Producción"
     COMPLETADO = "Completado"
     ARCHIVADO = "Archivado"
+
+# ── Fase ─────────────────────────────────────────────
+class NombreFase(str, Enum):
+    SEMBRADO = "Sembrado"
+    COSECHA = "Cosecha"
+    DESPULPADO = "Despulpado"
+    SECADO = "Secado"
+    TOSTADO = "Tostado"
+    MOLIDO = "Molido"
+    EMPAQUETADO = "Empaquetado"
+    TRANSPORTE = "Transporte"
+
+class EstadoFase(str, Enum):
+    PENDIENTE = "Pendiente"
+    EN_PROCESO = "En Proceso"
+    COMPLETADA = "Completada"
 
 class ColorPergamino(str, Enum):
     AMARILLO_PALIDO = "Amarillo pálido uniforme"

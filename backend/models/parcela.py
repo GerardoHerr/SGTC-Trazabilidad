@@ -16,6 +16,8 @@ class Parcela(Base):
     tipo_terreno = Column(SqlAlchemyEnum(TipoTerreno), nullable=False)
     # Lista de zonas: 1 para Regular, 2-4 para Irregular (almacenado como JSON)
     tipo_zona = Column(JSON, nullable=False)
+    # Solo para Irregular: {zona_nombre: hectareas} - almacenado como JSON
+    zonas_hectareas = Column(JSON, nullable=True)
     # Características técnicas
     ubicacion = Column(String, nullable=True)
     ph_suelo = Column(Float, nullable=False)

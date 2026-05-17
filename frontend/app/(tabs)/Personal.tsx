@@ -13,6 +13,7 @@ import { BorderRadius, Colors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Button, Card, SearchBar } from '@/components';
 import { getPersonal } from '@/services/personal_service';
+import { getAgricultores } from '@/services/fase_service';
 
 interface Trabajador {
     id: number;
@@ -21,6 +22,12 @@ interface Trabajador {
     identificacion: string;
     telefono: string;
     rol: string;
+}
+
+interface AgricultorInfo {
+    lote_activo_id: number | null;
+    lote_activo_codigo: string | null;
+    fase_activa: string | null;
 }
 
 const PAGE_SIZE = 10;
@@ -48,6 +55,7 @@ export default function PersonalScreen() {
     const [searchText, setSearchText] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [agricultorMap, setAgricultorMap] = useState<Record<number, AgricultorInfo>>({});
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -56,9 +64,15 @@ export default function PersonalScreen() {
         try {
             setLoading(true);
             setError(null);
-            const data = await getPersonal(page * PAGE_SIZE, PAGE_SIZE, search);
+            const [data, agrs] = await Promise.all([
+                getPersonal(page * PAGE_SIZE, PAGE_SIZE, search),
+                getAgricultores().catch(() => []),
+            ]);
             setTrabajadores(data.trabajadores);
             setTotal(data.total);
+            const map: Record<number, AgricultorInfo> = {};
+            agrs.forEach((a: any) => { map[a.id] = a; });
+            setAgricultorMap(map);
         } catch {
             setError('No se pudo cargar el personal. Verifica tu conexión.');
         } finally {
@@ -102,23 +116,20 @@ export default function PersonalScreen() {
 
     const renderTrabajador = ({ item }: { item: Trabajador }) => {
         const rolColor = ROL_COLOR[item.rol] ?? colors.primary;
+        const agInfo = agricultorMap[item.id];
+        const tieneAsignacion = agInfo?.lote_activo_id != null;
+
         return (
             <Card variant="elevated" style={styles.card}>
-                {/* Encabezado de tarjeta */}
+                {/* Encabezado */}
                 <View style={styles.cardHeader}>
-                    <View
-                        style={[
-                            styles.inicialesBadge,
-                            { backgroundColor: colors.primaryContainer },
-                        ]}>
+                    <View style={[styles.inicialesBadge, { backgroundColor: colors.primaryContainer }]}>
                         <Text style={[styles.iniciales, { color: colors.onPrimaryContainer }]}>
                             {getInitials(item.nombres, item.apellidos)}
                         </Text>
                     </View>
                     <View style={styles.cardNombre}>
-                        <Text
-                            style={[styles.nombreCompleto, { color: colors.onSurface }]}
-                            numberOfLines={1}>
+                        <Text style={[styles.nombreCompleto, { color: colors.onSurface }]} numberOfLines={1}>
                             {item.nombres} {item.apellidos}
                         </Text>
                         <Text style={[styles.cedula, { color: colors.onSurfaceVariant }]}>
@@ -129,33 +140,38 @@ export default function PersonalScreen() {
 
                 {/* Detalles */}
                 <View style={styles.cardDetalles}>
-                    <View
-                        style={[
-                            styles.rolBadge,
-                            {
-                                backgroundColor: rolColor + '18',
-                                borderColor: rolColor + '50',
-                            },
-                        ]}>
+                    <View style={[styles.rolBadge, { backgroundColor: rolColor + '18', borderColor: rolColor + '50' }]}>
                         <MaterialCommunityIcons name="briefcase-outline" size={12} color={rolColor} />
                         <Text style={[styles.rolText, { color: rolColor }]}>{item.rol}</Text>
                     </View>
                     <View style={styles.telefonoRow}>
-                        <MaterialCommunityIcons
-                            name="phone-outline"
-                            size={13}
-                            color={colors.onSurfaceVariant}
-                        />
-                        <Text style={[styles.telefonoText, { color: colors.onSurfaceVariant }]}>
-                            {item.telefono}
-                        </Text>
+                        <MaterialCommunityIcons name="phone-outline" size={13} color={colors.onSurfaceVariant} />
+                        <Text style={[styles.telefonoText, { color: colors.onSurfaceVariant }]}>{item.telefono}</Text>
                     </View>
                 </View>
+
+                {/* Lote / Fase actual */}
+                {tieneAsignacion && (
+                    <View style={[styles.asignacionRow, { backgroundColor: colors.success + '12', borderColor: colors.success + '40' }]}>
+                        <MaterialCommunityIcons name="sprout-outline" size={14} color={colors.success} />
+                        <Text style={[styles.asignacionText, { color: colors.success }]}>
+                            Lote {agInfo.lote_activo_codigo}
+                        </Text>
+                        {agInfo.fase_activa && (
+                            <>
+                                <Text style={{ color: colors.onSurfaceVariant, fontSize: 12 }}>·</Text>
+                                <Text style={[styles.asignacionText, { color: colors.onSurfaceVariant }]}>
+                                    {agInfo.fase_activa}
+                                </Text>
+                            </>
+                        )}
+                    </View>
+                )}
 
                 {/* Footer */}
                 <View style={[styles.cardFooter, { borderTopColor: colors.outlineVariant }]}>
                     <Button
-                        title="Editar"
+                        title="Ver detalle"
                         onPress={() => router.push({ pathname: '/personal/[id]' as any, params: { id: item.id } })}
                         variant="outlined"
                         size="small"
@@ -388,6 +404,21 @@ const styles = StyleSheet.create({
     },
     telefonoText: {
         ...Typography.labelMedium,
+    },
+    asignacionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        borderWidth: 1,
+        borderRadius: BorderRadius.md,
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 5,
+        marginBottom: Spacing.sm,
+        flexWrap: 'wrap',
+    },
+    asignacionText: {
+        fontSize: 12,
+        fontWeight: '600',
     },
     cardFooter: {
         borderTopWidth: 1,
