@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Enum as SqlAlchemyEnum
+from sqlalchemy import Column, Integer, String, Enum as SqlAlchemyEnum, DateTime
+from datetime import datetime
 from database.connection import Base
 # Importamos los enums del archivo anterior
 from models.Enums import (
@@ -21,4 +22,10 @@ class Semilla(Base):
     olor = Column(SqlAlchemyEnum(OlorSemilla), nullable=True)
     color = Column(SqlAlchemyEnum(ColorPergamino), nullable=True)
     integridad_pergamino = Column(SqlAlchemyEnum(IntegridadPergamino), nullable=True)
+    
+    # Campo para el anexo
+    anexo_nombre = Column(String, nullable=True)
+    anexo_ruta = Column(String, nullable=True)
+    anexo_tamano = Column(Integer, nullable=True)  # en bytes
+    fecha_creacion = Column(DateTime, default=datetime.utcnow)
 

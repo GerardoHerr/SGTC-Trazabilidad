@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Card, Button } from '@/components';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createSemilla } from '@/services/semilla_service';
+
+// Constantes para validación de archivo
+const ALLOWED_FILE_TYPES = ['application/pdf', 'text/csv', 'image/jpeg', 'image/png'];
+const ALLOWED_EXTENSIONS = ['.pdf', '.csv', '.jpg', '.jpeg', '.png'];
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB en bytes
 
 // Enums con opciones
 const VARIEDADES = [
@@ -53,6 +59,13 @@ interface FormState {
   olor: string;
   color: string;
   integridad_pergamino: string;
+}
+
+interface FileData {
+  uri: string;
+  name: string;
+  size: number;
+  mimeType?: string;
 }
 
 interface PickerFieldProps {
@@ -120,6 +133,23 @@ const PickerField = ({ label, value, options, onSelect, colors, icon }: PickerFi
   );
 };
 
+const getFileIcon = (fileName: string): any => {
+  const extension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+  
+  switch (extension) {
+    case '.pdf':
+      return 'file-pdf-box';
+    case '.csv':
+      return 'file-csv';
+    case '.jpg':
+    case '.jpeg':
+    case '.png':
+      return 'file-image';
+    default:
+      return 'file';
+  }
+};
+
 export default function AgregarSemilla() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -138,6 +168,7 @@ export default function AgregarSemilla() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [anexo, setAnexo] = useState<FileData | null>(null);
 
   const handleInputChange = (field: keyof FormState, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -167,7 +198,7 @@ export default function AgregarSemilla() {
 
     try {
       setLoading(true);
-      await createSemilla(form);
+      await createSemilla(form, anexo);
       setSuccess(true);
     } catch (err) {
       setError('Error al guardar la semilla');
@@ -185,6 +216,63 @@ export default function AgregarSemilla() {
       return () => clearTimeout(timer);
     }
   }, [success, router]);
+
+  const validateFile = (file: any): { valid: boolean; error?: string } => {
+    // Validar extensión
+    const fileName = file.name || '';
+    const extension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+    
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+      return {
+        valid: false,
+        error: `Formato no permitido. Solo se aceptan: PDF, CSV, JPG, PNG`
+      };
+    }
+
+    // Validar tamaño
+    if (file.size > MAX_FILE_SIZE) {
+      const sizeMB = (MAX_FILE_SIZE / (1024 * 1024)).toFixed(0);
+      return {
+        valid: false,
+        error: `El archivo supera el tamaño máximo permitido (${sizeMB}MB)`
+      };
+    }
+
+    return { valid: true };
+  };
+
+  const handleSelectFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'text/csv', 'image/jpeg', 'image/png']
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        const validation = validateFile(file);
+        
+        if (!validation.valid) {
+          setError(validation.error || 'Error al validar archivo');
+          return;
+        }
+
+        setAnexo({
+          uri: file.uri,
+          name: file.name || 'archivo',
+          size: file.size || 0,
+          mimeType: file.mimeType
+        });
+        setError(null);
+      }
+    } catch (err) {
+      setError('Error al seleccionar archivo');
+      console.error(err);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setAnexo(null);
+  };
 
   const handleCancel = () => {
     router.back();
@@ -300,7 +388,7 @@ export default function AgregarSemilla() {
             options={OLORES}
             onSelect={(value) => handleSelectChange('olor', value)}
             colors={colors}
-            icon="nose"
+            icon="scent"
           />
 
           {/* Color */}
@@ -327,6 +415,48 @@ export default function AgregarSemilla() {
             colors={colors}
             icon="check-circle"
           />
+
+          {/* Section 5: Anexo */}
+          <Text style={[styles.sectionTitle, { color: colors.onSurface, marginTop: Spacing.lg }]}>
+            Anexo Adjunto
+          </Text>
+
+          {!anexo ? (
+            <TouchableOpacity
+              style={[styles.filePickerButton, { borderColor: colors.secondary, backgroundColor: colors.secondaryContainer }]}
+              onPress={handleSelectFile}
+            >
+              <MaterialCommunityIcons name="cloud-upload-outline" size={28} color={colors.secondary} />
+              <Text style={[styles.filePickerText, { color: colors.secondary }]}>
+                Seleccionar Archivo
+              </Text>
+              <Text style={[styles.filePickerSubtext, { color: colors.onSurfaceVariant }]}>
+                PDF, CSV, JPG o PNG (Máx. 5MB)
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.fileSelectedContainer, { borderColor: colors.secondary, backgroundColor: colors.secondaryContainer + '20' }]}>
+              <View style={styles.fileInfo}>
+                <MaterialCommunityIcons 
+                  name={getFileIcon(anexo.name)} 
+                  size={24} 
+                  color={colors.secondary} 
+                  style={styles.fileIcon}
+                />
+                <View style={styles.fileDetails}>
+                  <Text style={[styles.fileName, { color: colors.onSurface }]} numberOfLines={1}>
+                    {anexo.name}
+                  </Text>
+                  <Text style={[styles.fileSize, { color: colors.onSurfaceVariant }]}>
+                    {(anexo.size / 1024).toFixed(2)} KB
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={handleRemoveFile}>
+                <MaterialCommunityIcons name="close-circle" size={24} color={colors.error} />
+              </TouchableOpacity>
+            </View>
+          )}
         </Card>
       </ScrollView>
 
@@ -480,5 +610,53 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  filePickerButton: {
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  filePickerText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  filePickerSubtext: {
+    fontSize: 12,
+    fontWeight: '400',
+  },
+  fileSelectedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+  },
+  fileInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: Spacing.md,
+  },
+  fileIcon: {
+    marginRight: Spacing.sm,
+  },
+  fileDetails: {
+    flex: 1,
+  },
+  fileName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  fileSize: {
+    fontSize: 12,
+    fontWeight: '400',
+    marginTop: Spacing.xs,
   },
 });

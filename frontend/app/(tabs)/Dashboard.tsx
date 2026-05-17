@@ -36,7 +36,7 @@ export default function DashboardScreen() {
         />
         <Button
             title="Personal"
-            onPress={() => router.push('/(tabs)/Personal')}
+            onPress={() => router.push('/Personal' as any)}
             variant="primary"
             size="small"
             style={{ marginTop: Spacing.lg }}
@@ -44,7 +44,7 @@ export default function DashboardScreen() {
 
         <Button
             title="Parcelas"
-            onPress={() => router.push('/(tabs)/Parcelas')}
+            onPress={() => router.push('/Parcelas' as any)}
             variant="tertiary"
             size="small"
             style={{ marginTop: Spacing.lg }}

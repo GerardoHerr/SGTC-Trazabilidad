@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 from models.Enums import (
     VariedadCafe, MetodoSecado, 
     MetodoSeleccion, OlorSemilla, ColorPergamino, IntegridadPergamino
@@ -19,6 +20,9 @@ class SemillaCreate(SemillaCafeBase):
 
 class SemillaResponse(SemillaCafeBase):
     id: int
+    anexo_nombre: Optional[str] = None
+    anexo_tamano: Optional[int] = None
+    fecha_creacion: Optional[datetime] = None
 
     class Config:
         from_attributes = True  # Permite mapear modelos de SQLAlchemy a Pydantic

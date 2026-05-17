@@ -16,6 +16,44 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="agregarSemilla" options={{ headerShown: true, title: 'Agregar Semilla' }} />
+        <Stack.Screen name="Listarsemilla" options={{ headerShown: true, title: 'Listar Semillas' }} />
+        <Stack.Screen 
+          name="parcela/[id]" 
+          options={{ 
+            headerShown: true,
+            title: 'Detalle de Parcela'
+          }} 
+        />
+        <Stack.Screen 
+          name="parcela/agregar" 
+          options={{ 
+            headerShown: true,
+            title: 'Agregar Parcela'
+          }} 
+        />
+        <Stack.Screen 
+          name="personal/[id]" 
+          options={{ 
+            headerShown: true,
+            title: 'Detalle de Personal'
+          }} 
+        />
+        <Stack.Screen
+          name="semilla/[id]"
+          options={{
+            headerShown: true,
+            title: 'Detalle de Semilla'
+          }}
+        />
+
+        <Stack.Screen 
+          name="personal/agregar" 
+          options={{ 
+            headerShown: true,
+            title: 'Agregar Personal'
+          }} 
+        />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

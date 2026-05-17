@@ -156,7 +156,7 @@ export default function PersonalScreen() {
                 <View style={[styles.cardFooter, { borderTopColor: colors.outlineVariant }]}>
                     <Button
                         title="Editar"
-                        onPress={() => router.push(`/personal/${item.id}`)}
+                        onPress={() => router.push({ pathname: '/personal/[id]' as any, params: { id: item.id } })}
                         variant="outlined"
                         size="small"
                         style={{ flex: 1 }}
@@ -179,7 +179,7 @@ export default function PersonalScreen() {
                     </View>
                     <Button
                         title="Agregar"
-                        onPress={() => router.push('/personal/agregar')}
+                        onPress={() => router.push('/personal/agregar' as any)}
                         variant="secondary"
                         size="small"
                     />

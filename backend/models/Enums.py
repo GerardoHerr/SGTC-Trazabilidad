@@ -32,6 +32,7 @@ class RolTrabajador(str, Enum):
     SUPERVISOR = "Supervisor"
     CAPATAZ = "Capataz"
 
+# ── Semilla ─────────────────────────────────────────────
 class VariedadCafe(str, Enum):
     CATURRA = "Caturra"
     CASTILLO = "Castillo"

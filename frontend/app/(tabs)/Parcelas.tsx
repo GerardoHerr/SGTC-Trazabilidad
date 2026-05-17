@@ -112,7 +112,7 @@ export default function ParcelasScreen() {
         return (
             <TouchableOpacity
                 activeOpacity={0.85}
-                onPress={() => router.push(`/parcela/${item.id}`)}>
+                onPress={() => router.push({ pathname: '/parcela/[id]' as any, params: { id: item.id } })}>
                 <Card variant="elevated" style={styles.card}>
                     {/* Encabezado */}
                     <View style={styles.cardHeader}>
@@ -206,7 +206,7 @@ export default function ParcelasScreen() {
                     </View>
                     <Button
                         title="Nueva"
-                        onPress={() => router.push('/parcela/agregar')}
+                        onPress={() => router.push('/parcela/agregar' as any)}
                         variant="secondary"
                         size="small"
                     />
