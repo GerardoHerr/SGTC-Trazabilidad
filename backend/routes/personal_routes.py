@@ -2,11 +2,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from database.connection import SessionLocal
 from models.personal import Personal
+from models.trabajador_lote_fase import TrabajadorLoteFase
+from models.lote_fase import LoteFase
+from models.lote import Lote
+from models.fase import Fase
+from models.Enums import RolTrabajador, EstadoFase
 from schemas.personal_schema import PersonalCreate, PersonalUpdate, PersonalResponse
+from schemas.fase_schema import AgricultorResponse
 
 router = APIRouter(prefix="/personal", tags=["Personal"])
 
@@ -17,6 +23,56 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+@router.get("/agricultores", response_model=List[AgricultorResponse])
+def listar_agricultores(db: Session = Depends(get_db)):
+    """Retorna todos los trabajadores con rol Agricultor e info de su lote/fase activa."""
+    agricultores = (
+        db.query(Personal)
+        .filter(Personal.rol == RolTrabajador.AGRICULTOR)
+        .order_by(Personal.apellidos)
+        .all()
+    )
+
+    result = []
+    for p in agricultores:
+        # Buscar si tiene una lote_fase activa (EN_PROCESO)
+        tlf = (
+            db.query(TrabajadorLoteFase)
+            .join(LoteFase, LoteFase.id == TrabajadorLoteFase.lote_fase_id)
+            .filter(
+                TrabajadorLoteFase.personal_id == p.id,
+                LoteFase.estado == EstadoFase.EN_PROCESO,
+            )
+            .first()
+        )
+
+        lote_activo_id = None
+        lote_activo_codigo = None
+        fase_activa = None
+
+        if tlf:
+            lf = db.query(LoteFase).filter(LoteFase.id == tlf.lote_fase_id).first()
+            if lf:
+                lote = db.query(Lote).filter(Lote.id == lf.lote_id).first()
+                fase = db.query(Fase).filter(Fase.id == lf.fase_id).first()
+                lote_activo_id = lote.id if lote else None
+                lote_activo_codigo = lote.codigo if lote else None
+                fase_activa = fase.nombre if fase else None
+
+        result.append(
+            AgricultorResponse(
+                id=p.id,
+                nombres=p.nombres,
+                apellidos=p.apellidos,
+                rol=p.rol,
+                lote_activo_id=lote_activo_id,
+                lote_activo_codigo=lote_activo_codigo,
+                fase_activa=fase_activa,
+            )
+        )
+    return result
 
 
 @router.get("/")

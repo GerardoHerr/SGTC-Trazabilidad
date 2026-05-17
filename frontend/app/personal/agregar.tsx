@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getOpciones, addOpcion } from '@/services/catalogo_service';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BorderRadius, Colors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -202,6 +202,8 @@ export default function AgregarPersonal() {
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'light'];
     const router = useRouter();
+    const { returnToLoteId } = useLocalSearchParams();
+    const loteIdRetorno = Array.isArray(returnToLoteId) ? returnToLoteId[0] : returnToLoteId ?? null;
 
     const [form, setForm] = useState<FormState>({
         nombres: '',
@@ -266,7 +268,13 @@ export default function AgregarPersonal() {
 
     useEffect(() => {
         if (success) {
-            const timer = setTimeout(() => router.back(), 1800);
+            const timer = setTimeout(() => {
+                if (loteIdRetorno) {
+                    router.replace({ pathname: '/lote/[id]' as any, params: { id: loteIdRetorno } });
+                } else {
+                    router.back();
+                }
+            }, 1800);
             return () => clearTimeout(timer);
         }
     }, [success]);
