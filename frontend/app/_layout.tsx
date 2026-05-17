@@ -47,6 +47,30 @@ export default function RootLayout() {
           }}
         />
 
+        <Stack.Screen
+          name="agregarLotes"
+          options={{
+            headerShown: true,
+            title: 'Crear Lotes'
+          }}
+        />
+
+        <Stack.Screen
+          name="ListarLotes"
+          options={{
+            headerShown: true,
+            title: 'Inventario de Lotes'
+          }}
+        />
+
+        <Stack.Screen
+          name="lote/[id]"
+          options={{
+            headerShown: true,
+            title: 'Detalle de Lote'
+          }}
+        />
+
         <Stack.Screen 
           name="personal/agregar" 
           options={{ 
