@@ -8,6 +8,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getOpciones, addOpcion } from '@/services/catalogo_service';
 import { Stack, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BorderRadius, Colors, Spacing, Typography } from '@/constants/theme';
@@ -32,68 +34,121 @@ interface PickerFieldProps {
     onSelect: (value: string) => void;
     icon: string;
     colors: any;
+    storageKey?: string;
 }
 
-function PickerField({ label, value, options, onSelect, icon, colors }: PickerFieldProps) {
+function PickerField({ label, value, options: initialOptions, onSelect, icon, colors, storageKey }: PickerFieldProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [options, setOptions] = useState(initialOptions);
+    const [showNew, setShowNew] = useState(false);
+    const [newItem, setNewItem] = useState('');
+    const [confirmando, setConfirmando] = useState(false);
+
+    useEffect(() => {
+        if (!storageKey) return;
+        getOpciones(storageKey)
+            .then((serverOpts: string[]) => {
+                setOptions([...new Set([...initialOptions, ...serverOpts])]);
+                AsyncStorage.setItem(storageKey, JSON.stringify(serverOpts));
+            })
+            .catch(() => {
+                AsyncStorage.getItem(storageKey).then(stored => {
+                    if (stored) {
+                        const cached: string[] = JSON.parse(stored);
+                        setOptions(prev => [...new Set([...prev, ...cached])]);
+                    }
+                });
+            });
+    }, []);
+
+    const handleAddNew = () => {
+        if (!newItem.trim()) return;
+        setConfirmando(true);
+    };
+
+    const confirmAdd = async () => {
+        const trimmed = newItem.trim();
+        setConfirmando(false);
+        try {
+            const serverOpts: string[] = storageKey
+                ? await addOpcion(storageKey, trimmed)
+                : [...options, trimmed];
+            const merged = [...new Set([...initialOptions, ...serverOpts])];
+            setOptions(merged);
+            if (storageKey) AsyncStorage.setItem(storageKey, JSON.stringify(serverOpts));
+        } catch {
+            const updated = options.includes(trimmed) ? options : [...options, trimmed];
+            setOptions(updated);
+            if (storageKey) {
+                const custom = updated.filter(o => !initialOptions.includes(o));
+                AsyncStorage.setItem(storageKey, JSON.stringify(custom));
+            }
+        }
+        onSelect(trimmed);
+        setNewItem('');
+        setShowNew(false);
+        setIsOpen(false);
+    };
 
     return (
         <View style={styles.fieldContainer}>
-            <Text style={[styles.label, { color: colors.onSurface }]}>{label}</Text>
+            <View style={styles.labelRow}>
+                <Text style={[styles.label, { color: colors.onSurface }]}>{label}</Text>
+                <TouchableOpacity onPress={() => { setShowNew(!showNew); setIsOpen(false); }} style={styles.addIconBtn}>
+                    <MaterialCommunityIcons name="plus-circle-outline" size={20} color={colors.secondary} />
+                </TouchableOpacity>
+            </View>
             <TouchableOpacity
-                style={[
-                    styles.pickerButton,
-                    { borderColor: colors.outlineVariant, backgroundColor: colors.surfaceContainerLow },
-                ]}
-                onPress={() => setIsOpen(!isOpen)}
-                activeOpacity={0.7}>
+                style={[styles.pickerButton, { borderColor: colors.outlineVariant, backgroundColor: colors.surfaceContainerLow }]}
+                onPress={() => { setIsOpen(!isOpen); setShowNew(false); }} activeOpacity={0.7}>
                 <MaterialCommunityIcons name={icon as any} size={18} color={colors.secondary} />
-                <Text
-                    style={[
-                        styles.pickerText,
-                        { color: value ? colors.onSurface : colors.onSurfaceVariant },
-                    ]}>
+                <Text style={[styles.pickerText, { color: value ? colors.onSurface : colors.onSurfaceVariant }]}>
                     {value || `Seleccionar ${label.toLowerCase()}`}
                 </Text>
-                <MaterialCommunityIcons
-                    name={isOpen ? 'chevron-up' : 'chevron-down'}
-                    size={20}
-                    color={colors.onSurfaceVariant}
-                />
+                <MaterialCommunityIcons name={isOpen ? 'chevron-up' : 'chevron-down'} size={20} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
+            {showNew && (
+                <View style={[styles.addNewRow, { borderColor: colors.secondary, backgroundColor: colors.surfaceContainerLow }]}>
+                    <TextInput
+                        style={[styles.addNewInput, { color: colors.onSurface }]}
+                        placeholder="Nuevo valor..."
+                        placeholderTextColor={colors.onSurfaceVariant}
+                        value={newItem}
+                        onChangeText={(t) => { setNewItem(t); setConfirmando(false); }}
+                        autoFocus
+                    />
+                    <TouchableOpacity onPress={handleAddNew} style={[styles.addNewConfirm, { backgroundColor: colors.secondary }]}>
+                        <MaterialCommunityIcons name="check" size={16} color={colors.onSecondary ?? '#fff'} />
+                    </TouchableOpacity>
+                </View>
+            )}
+            {confirmando && (
+                <View style={[styles.confirmRow, { backgroundColor: colors.primaryContainer, borderColor: colors.primary }]}>
+                    <Text style={[styles.confirmText, { color: colors.onPrimaryContainer }]} numberOfLines={1}>
+                        ¿Añadir "{newItem.trim()}"?
+                    </Text>
+                    <TouchableOpacity onPress={confirmAdd} style={[styles.confirmSi, { backgroundColor: colors.primary }]}>
+                        <Text style={{ color: colors.onPrimary ?? '#fff', fontSize: 13, fontWeight: '700' }}>Sí</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setConfirmando(false)} style={[styles.confirmNo, { borderColor: colors.primary }]}>
+                        <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>No</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
             {isOpen && (
                 <Card variant="filled" style={styles.dropdown}>
                     {options.map((option) => (
                         <TouchableOpacity
                             key={option}
-                            style={[
-                                styles.dropdownItem,
-                                { borderBottomColor: colors.outlineVariant },
-                                value === option && { backgroundColor: colors.primaryContainer },
-                            ]}
-                            onPress={() => {
-                                onSelect(option);
-                                setIsOpen(false);
-                            }}>
-                            <Text
-                                style={[
-                                    styles.dropdownItemText,
-                                    {
-                                        color:
-                                            value === option
-                                                ? colors.onPrimaryContainer
-                                                : colors.onSurface,
-                                    },
-                                ]}>
+                            style={[styles.dropdownItem, { borderBottomColor: colors.outlineVariant },
+                                value === option && { backgroundColor: colors.primaryContainer }]}
+                            onPress={() => { onSelect(option); setIsOpen(false); }}>
+                            <Text style={[styles.dropdownItemText, {
+                                color: value === option ? colors.onPrimaryContainer : colors.onSurface,
+                            }]}>
                                 {option}
                             </Text>
-                            {value === option && (
-                                <MaterialCommunityIcons
-                                    name="check"
-                                    size={18}
-                                    color={colors.onPrimaryContainer}
-                                />
-                            )}
+                            {value === option && <MaterialCommunityIcons name="check" size={18} color={colors.onPrimaryContainer} />}
                         </TouchableOpacity>
                     ))}
                 </Card>
@@ -321,6 +376,7 @@ export default function AgregarPersonal() {
                         onSelect={(v) => handleChange('rol', v)}
                         icon="briefcase-outline"
                         colors={colors}
+                        storageKey="custom_rol"
                     />
                 </Card>
             </ScrollView>
@@ -395,6 +451,23 @@ const styles = StyleSheet.create({
         paddingVertical: Spacing.md,
     },
     textInput: { flex: 1, ...Typography.bodyMedium },
+    labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm },
+    addIconBtn: { padding: 4 },
+    addNewRow: {
+        flexDirection: 'row', alignItems: 'center',
+        borderWidth: 1, borderRadius: BorderRadius.lg,
+        paddingLeft: Spacing.md, marginTop: Spacing.sm,
+    },
+    addNewInput: { flex: 1, ...Typography.bodyMedium, paddingVertical: Spacing.sm },
+    addNewConfirm: { padding: Spacing.sm, borderRadius: BorderRadius.lg, margin: 4 },
+    confirmRow: {
+        flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+        borderWidth: 1, borderRadius: BorderRadius.lg,
+        paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, marginTop: Spacing.xs,
+    },
+    confirmText: { flex: 1, fontSize: 13, fontWeight: '500' },
+    confirmSi: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md },
+    confirmNo: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1 },
     pickerButton: {
         flexDirection: 'row',
         alignItems: 'center',

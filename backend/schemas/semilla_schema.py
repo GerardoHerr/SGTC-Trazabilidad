@@ -7,8 +7,9 @@ from models.Enums import (
 )
 
 class SemillaCafeBase(BaseModel):
-    variedad: VariedadCafe  # Obligatorio
+    variedad: VariedadCafe
     origen: Optional[str] = None
+    distribuidor: Optional[str] = None
     metodo_secado: Optional[MetodoSecado] = None
     seleccion: Optional[MetodoSeleccion] = None
     olor: Optional[OlorSemilla] = None
