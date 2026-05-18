@@ -231,7 +231,8 @@ function ZonaSelector({
                             ]}>
                             {isRegular ? (
                                 <View style={[styles.radio, { borderColor: isSelected ? colors.primary : colors.outlineVariant }]}>
-                                    {isSelected && <View style={[styles.radioFill, { backgroundColor: colors.primary }]} />}
+                                    {/* Siempre montado — display evita removeChild en React Native Web */}
+                                    <View style={[styles.radioFill, { backgroundColor: colors.primary, display: isSelected ? 'flex' : 'none' }]} />
                                 </View>
                             ) : (
                                 <View style={[
@@ -241,15 +242,18 @@ function ZonaSelector({
                                         backgroundColor: isSelected ? colors.primary : 'transparent',
                                     },
                                 ]}>
-                                    {isSelected && <MaterialCommunityIcons name="check" size={13} color="#fff" />}
+                                    {/* Siempre montado — display evita removeChild en React Native Web */}
+                                    <View style={{ display: isSelected ? 'flex' : 'none' }}>
+                                        <MaterialCommunityIcons name="check" size={13} color="#fff" />
+                                    </View>
                                 </View>
                             )}
                             <Text style={[styles.zonaText, { color: colors.onSurface }]}>{zona}</Text>
                         </TouchableOpacity>
 
-                        {/* Input hectáreas por zona (solo Irregular cuando está seleccionada) */}
-                        {!isRegular && isSelected && (
-                            <View style={[styles.zonaHaRow, { borderColor: colors.outlineVariant, backgroundColor: colors.surfaceContainerLow }]}>
+                        {/* Input hectáreas por zona (solo Irregular) — siempre montado, visible solo cuando isSelected */}
+                        {!isRegular && (
+                            <View style={[styles.zonaHaRow, { borderColor: colors.outlineVariant, backgroundColor: colors.surfaceContainerLow, display: isSelected ? 'flex' : 'none' }]}>
                                 <MaterialCommunityIcons name="ruler-square" size={15} color={colors.secondary} />
                                 <TextInput
                                     style={[styles.zonaHaInput, { color: colors.onSurface }]}

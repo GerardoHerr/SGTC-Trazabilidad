@@ -13,6 +13,9 @@ import { getSemillas } from '@/services/semilla_service';
 import { getParcelaById } from '@/services/parcela_service';
 import { getAgricultores, iniciarEtapa, getFasesLote } from '@/services/fase_service';
 
+// ── Constantes de fases ────────────────────────────────────────────────────
+const FASES_ORDEN = ['Sembrado','Cosecha','Despulpado','Secado','Tostado','Molido','Empaquetado','Transporte'];
+
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmtFecha = (d: string | null) =>
     d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -159,20 +162,6 @@ export default function DetalleLote() {
             </View>
 
             <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll}>
-                {/* Banners */}
-                {error && (
-                    <View style={[s.banner, { backgroundColor: c.error + '15', borderColor: c.error }]}>
-                        <MaterialCommunityIcons name="alert-circle" size={16} color={c.error} />
-                        <Text style={[s.bannerText, { color: c.error }]}>{error}</Text>
-                    </View>
-                )}
-                {success && (
-                    <View style={[s.banner, { backgroundColor: c.success + '15', borderColor: c.success }]}>
-                        <MaterialCommunityIcons name="check-circle" size={16} color={c.success} />
-                        <Text style={[s.bannerText, { color: c.success }]}>{success}</Text>
-                    </View>
-                )}
-
                 {/* ── Info General ── */}
                 <Card variant="elevated" style={s.card}>
                     <Text style={[s.sectionTitle, { color: c.onSurface }]}>Información General</Text>
@@ -336,6 +325,20 @@ export default function DetalleLote() {
                             </Text>
                         )}
 
+                        {/* Banners de validación / confirmación */}
+                        {error && (
+                            <View style={[s.banner, { backgroundColor: c.error + '15', borderColor: c.error }]}>
+                                <MaterialCommunityIcons name="alert-circle" size={15} color={c.error} />
+                                <Text style={[s.bannerText, { color: c.error }]}>{error}</Text>
+                            </View>
+                        )}
+                        {success && (
+                            <View style={[s.banner, { backgroundColor: c.success + '15', borderColor: c.success }]}>
+                                <MaterialCommunityIcons name="check-circle" size={15} color={c.success} />
+                                <Text style={[s.bannerText, { color: c.success }]}>{success}</Text>
+                            </View>
+                        )}
+
                         <TouchableOpacity
                             style={[s.btnIniciar, { backgroundColor: iniciando ? c.onSurfaceVariant : c.primary }]}
                             onPress={handleIniciarEtapa}
@@ -350,19 +353,25 @@ export default function DetalleLote() {
                     </Card>
                 )}
 
-                {/* ── EN_PRODUCCION: Fases ── */}
+                {/* ── EN_PRODUCCION: Progreso + Fases ── */}
                 {!estaCreado && (
-                    <Card variant="elevated" style={s.card}>
-                        <Text style={[s.sectionTitle, { color: c.onSurface }]}>Fases del Lote</Text>
-
-                        {fases.length === 0 ? (
-                            <Text style={{ color: c.onSurfaceVariant }}>Sin fases registradas.</Text>
-                        ) : (
-                            fases.map((fase, idx) => (
-                                <FaseCard key={fase.id} fase={fase} colors={c} isLast={idx === fases.length - 1} />
-                            ))
+                    <>
+                        {fases.length > 0 && (
+                            <Card variant="elevated" style={s.card}>
+                                <ProgresoLote fases={fases} colors={c} />
+                            </Card>
                         )}
-                    </Card>
+                        <Card variant="elevated" style={s.card}>
+                            <Text style={[s.sectionTitle, { color: c.onSurface }]}>Fases del Lote</Text>
+                            {fases.length === 0 ? (
+                                <Text style={{ color: c.onSurfaceVariant }}>Sin fases registradas.</Text>
+                            ) : (
+                                fases.map((fase, idx) => (
+                                    <FaseCard key={fase.id} fase={fase} colors={c} isLast={idx === fases.length - 1} />
+                                ))
+                            )}
+                        </Card>
+                    </>
                 )}
 
                 <View style={{ height: 32 }} />
@@ -370,6 +379,82 @@ export default function DetalleLote() {
         </View>
     );
 }
+
+// ── ProgresoLote ───────────────────────────────────────────────────────────
+function ProgresoLote({ fases, colors: c }: { fases: any[]; colors: any }) {
+    const completadas = fases.filter(f => f.estado === 'Completada').length;
+    const enProceso = fases.find(f => f.estado === 'En Proceso');
+    const pct = Math.round((completadas / FASES_ORDEN.length) * 100);
+
+    return (
+        <View style={sp.wrapper}>
+            <View style={sp.headerRow}>
+                <Text style={[sp.titulo, { color: c.onSurface }]}>Progreso de producción</Text>
+                <Text style={[sp.pct, { color: c.primary }]}>{pct}%</Text>
+            </View>
+
+            {/* Barra continua */}
+            <View style={[sp.barBg, { backgroundColor: c.outlineVariant }]}>
+                <View style={[sp.barFill, { width: `${pct}%` as any, backgroundColor: c.primary }]} />
+            </View>
+
+            {/* Etapas */}
+            <View style={sp.etapas}>
+                {FASES_ORDEN.map((nombre) => {
+                    const fase = fases.find(f => f.fase_nombre === nombre);
+                    const completada = fase?.estado === 'Completada';
+                    const activa = fase?.estado === 'En Proceso';
+                    const color = completada ? c.success : activa ? c.primary : c.outlineVariant;
+                    return (
+                        <View key={nombre} style={sp.etapaCol}>
+                            <View style={[sp.dot, { backgroundColor: color, borderColor: color }]}>
+                                {completada && <MaterialCommunityIcons name="check" size={9} color="#fff" />}
+                                {activa && <View style={[sp.dotInner, { backgroundColor: '#fff' }]} />}
+                            </View>
+                            <Text
+                                style={[sp.etapaLabel, { color: completada || activa ? c.onSurface : c.onSurfaceVariant }]}
+                                numberOfLines={2}>
+                                {nombre}
+                            </Text>
+                        </View>
+                    );
+                })}
+            </View>
+
+            {enProceso && (
+                <View style={[sp.etapaActualBadge, { backgroundColor: c.primary + '15', borderColor: c.primary }]}>
+                    <MaterialCommunityIcons name="progress-clock" size={13} color={c.primary} />
+                    <Text style={[sp.etapaActualText, { color: c.primary }]}>
+                        Etapa actual: {enProceso.fase_nombre}
+                    </Text>
+                </View>
+            )}
+        </View>
+    );
+}
+
+const sp = StyleSheet.create({
+    wrapper: { marginBottom: 0 },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    titulo: { fontSize: 14, fontWeight: '700' },
+    pct: { fontSize: 14, fontWeight: '700' },
+    barBg: { height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 12 },
+    barFill: { height: 8, borderRadius: 4 },
+    etapas: { flexDirection: 'row', justifyContent: 'space-between' },
+    etapaCol: { alignItems: 'center', flex: 1 },
+    dot: {
+        width: 18, height: 18, borderRadius: 9, borderWidth: 2,
+        alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+    },
+    dotInner: { width: 6, height: 6, borderRadius: 3 },
+    etapaLabel: { fontSize: 8, textAlign: 'center', fontWeight: '500' },
+    etapaActualBadge: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5,
+        marginTop: 10, alignSelf: 'flex-start',
+    },
+    etapaActualText: { fontSize: 12, fontWeight: '600' },
+});
 
 // ── FaseCard ───────────────────────────────────────────────────────────────
 function FaseCard({ fase, colors: c, isLast }: { fase: any; colors: any; isLast: boolean }) {

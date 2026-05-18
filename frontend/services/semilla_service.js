@@ -18,6 +18,7 @@ export const createSemilla = async (semillaData, anexo) => {
         // Agregar datos de semilla directamente
         formData.append('variedad', semillaData.variedad || '');
         formData.append('origen', semillaData.origen || '');
+        formData.append('distribuidor', semillaData.distribuidor || '');
         formData.append('metodo_secado', semillaData.metodo_secado || '');
         formData.append('seleccion', semillaData.seleccion || '');
         formData.append('olor', semillaData.olor || '');
@@ -50,4 +51,26 @@ export const createSemilla = async (semillaData, anexo) => {
         console.error("Error creating semilla:", error);
         throw error;
     }
+};
+
+export const getSemillaById = async (id) => {
+    const response = await axios.get(`${Config.API_URL}/semillas/${id}`);
+    return response.data;
+};
+
+export const updateSemillaAnexo = async (semillaId, anexo) => {
+    const formData = new FormData();
+    try {
+        const resp = await fetch(anexo.uri);
+        const blob = await resp.blob();
+        formData.append('anexo', blob, anexo.name);
+    } catch {
+        formData.append('anexo', {
+            uri: anexo.uri,
+            type: anexo.mimeType || 'application/octet-stream',
+            name: anexo.name,
+        });
+    }
+    const response = await axios.patch(`${Config.API_URL}/semillas/${semillaId}/anexo`, formData);
+    return response.data;
 };
