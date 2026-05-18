@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator, ScrollView, StyleSheet,
+    ActivityIndicator, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet,
     Text, TouchableOpacity, View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -9,7 +9,7 @@ import { BorderRadius, Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Button, Card } from '@/components';
 import * as DocumentPicker from 'expo-document-picker';
-import { getSemillaById, updateSemillaAnexo } from '@/services/semilla_service';
+import { getSemillaById, updateSemillaAnexo, deleteAnexoSemilla } from '@/services/semilla_service';
 import Config from '@/constants/Config';
 
 const ALLOWED_EXTENSIONS = ['.pdf', '.csv', '.jpg', '.jpeg', '.png'];
@@ -50,6 +50,8 @@ export default function EditarSemilla() {
     const [semilla, setSemilla] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [nuevoAnexo, setNuevoAnexo] = useState<FileData | null>(null);
@@ -112,21 +114,43 @@ export default function EditarSemilla() {
 
     const handleDownload = async () => {
         if (!semilla?.anexo_nombre) return;
+        const url = `${Config.API_URL}/semillas/${semillaId}/anexo`;
         try {
-            const response = await fetch(`${Config.API_URL}/semillas/${semillaId}/anexo`);
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = semilla.anexo_nombre;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+            if (Platform.OS === 'web') {
+                const response = await fetch(url);
+                const blob = await response.blob();
+                const objectUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = objectUrl;
+                link.download = semilla.anexo_nombre;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(objectUrl);
+            } else {
+                // En móvil, abre el URL en el navegador del sistema
+                await Linking.openURL(url);
+            }
         } catch {
             setError('Error al descargar el archivo.');
         }
     };
+
+    const ejecutarEliminacion = async () => {
+        setDeleting(true);
+        setError(null);
+        try {
+            await deleteAnexoSemilla(semillaId);
+            setSemilla((prev: any) => ({ ...prev, anexo_nombre: null, anexo_ruta: null, anexo_tamano: null }));
+            setNuevoAnexo(null);
+        } catch (e: any) {
+            setError(e?.response?.data?.detail ?? 'Error al eliminar el archivo.');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const handleDeleteAnexo = () => setShowDeleteModal(true);
 
     if (loading) {
         return (
@@ -198,22 +222,33 @@ export default function EditarSemilla() {
                     <Text style={[s.sectionTitle, { color: c.onSurface }]}>Documento adjunto</Text>
 
                     {semilla.anexo_nombre ? (
-                        <View style={[s.fileCard, { backgroundColor: c.primaryContainer + '30', borderColor: c.outlineVariant }]}>
-                            <MaterialCommunityIcons name={getFileIcon(semilla.anexo_nombre)} size={28} color={c.primary} />
-                            <View style={{ flex: 1 }}>
-                                <Text style={[s.fileName, { color: c.onSurface }]} numberOfLines={1}>
-                                    {semilla.anexo_nombre}
-                                </Text>
-                                {semilla.anexo_tamano && (
-                                    <Text style={[s.fileSize, { color: c.onSurfaceVariant }]}>
-                                        {(semilla.anexo_tamano / 1024).toFixed(1)} KB
+                        <>
+                            <View style={[s.fileCard, { backgroundColor: c.primaryContainer + '30', borderColor: c.outlineVariant }]}>
+                                <MaterialCommunityIcons name={getFileIcon(semilla.anexo_nombre)} size={28} color={c.primary} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[s.fileName, { color: c.onSurface }]} numberOfLines={1}>
+                                        {semilla.anexo_nombre}
                                     </Text>
-                                )}
+                                    {semilla.anexo_tamano && (
+                                        <Text style={[s.fileSize, { color: c.onSurfaceVariant }]}>
+                                            {(semilla.anexo_tamano / 1024).toFixed(1)} KB
+                                        </Text>
+                                    )}
+                                </View>
+                                <TouchableOpacity onPress={handleDownload} style={[s.downloadBtn, { backgroundColor: c.primary }]}>
+                                    <MaterialCommunityIcons name="download" size={18} color="#fff" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={handleDeleteAnexo}
+                                    disabled={deleting}
+                                    style={[s.downloadBtn, { backgroundColor: '#fca5a5' }]}>
+                                    {deleting
+                                        ? <ActivityIndicator size={14} color="#fff" />
+                                        : <MaterialCommunityIcons name="trash-can-outline" size={18} color="#fff" />
+                                    }
+                                </TouchableOpacity>
                             </View>
-                            <TouchableOpacity onPress={handleDownload} style={[s.downloadBtn, { backgroundColor: c.primary }]}>
-                                <MaterialCommunityIcons name="download" size={18} color="#fff" />
-                            </TouchableOpacity>
-                        </View>
+                        </>
                     ) : (
                         <View style={[s.emptyFile, { borderColor: c.outlineVariant }]}>
                             <MaterialCommunityIcons name="file-remove-outline" size={32} color={c.onSurfaceVariant} />
@@ -270,6 +305,35 @@ export default function EditarSemilla() {
                     <ActivityIndicator size="large" color={c.primary} />
                 </View>
             )}
+
+            {/* Modal de confirmación para eliminar */}
+            <Modal
+                visible={showDeleteModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowDeleteModal(false)}>
+                <Pressable style={s.modalBackdrop} onPress={() => setShowDeleteModal(false)}>
+                    <Pressable style={[s.modalBox, { backgroundColor: c.surface }]} onPress={() => {}}>
+                        <MaterialCommunityIcons name="trash-can-outline" size={32} color={c.error} />
+                        <Text style={[s.modalTitle, { color: c.onSurface }]}>Eliminar archivo</Text>
+                        <Text style={[s.modalMsg, { color: c.onSurfaceVariant }]}>
+                            ¿Estás seguro de que deseas eliminar el archivo adjunto? Esta acción no se puede deshacer.
+                        </Text>
+                        <View style={s.modalBtns}>
+                            <TouchableOpacity
+                                style={[s.modalBtn, { borderWidth: 1, borderColor: c.outlineVariant }]}
+                                onPress={() => setShowDeleteModal(false)}>
+                                <Text style={[s.modalBtnText, { color: c.onSurface }]}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[s.modalBtn, { backgroundColor: '#f87171' }]}
+                                onPress={() => { setShowDeleteModal(false); ejecutarEliminacion(); }}>
+                                <Text style={[s.modalBtnText, { color: '#fff' }]}>Eliminar</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </View>
     );
 }
@@ -329,4 +393,25 @@ const s = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.4)',
         justifyContent: 'center', alignItems: 'center',
     },
+    modalBackdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center', alignItems: 'center',
+        padding: Spacing.xl,
+    },
+    modalBox: {
+        width: '100%', maxWidth: 360,
+        borderRadius: BorderRadius.lg,
+        padding: Spacing.xl,
+        alignItems: 'center', gap: Spacing.sm,
+        shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 16, elevation: 8,
+    },
+    modalTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
+    modalMsg: { fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: Spacing.sm },
+    modalBtns: { flexDirection: 'row', gap: Spacing.md, width: '100%' },
+    modalBtn: {
+        flex: 1, paddingVertical: Spacing.md,
+        borderRadius: BorderRadius.lg, alignItems: 'center',
+    },
+    modalBtnText: { fontSize: 14, fontWeight: '700' },
 });

@@ -158,6 +158,23 @@ async def actualizar_anexo_semilla(semilla_id: int, request: Request, db: Sessio
     return semilla
 
 
+@router.delete("/semillas/{semilla_id}/anexo")
+def eliminar_anexo_semilla(semilla_id: int, db: Session = Depends(get_db)):
+    semilla = db.query(Semilla).filter(Semilla.id == semilla_id).first()
+    if not semilla:
+        raise HTTPException(status_code=404, detail="Semilla no encontrada")
+    if not semilla.anexo_nombre:
+        raise HTTPException(status_code=404, detail="Esta semilla no tiene archivo adjunto")
+    if semilla.anexo_ruta and os.path.exists(semilla.anexo_ruta):
+        os.remove(semilla.anexo_ruta)
+    semilla.anexo_nombre = None
+    semilla.anexo_ruta = None
+    semilla.anexo_tamano = None
+    db.commit()
+    db.refresh(semilla)
+    return {"mensaje": "Archivo eliminado correctamente"}
+
+
 @router.get("/semillas/{semilla_id}/anexo")
 def descargar_anexo(semilla_id: int, db: Session = Depends(get_db)):
     semilla = db.query(Semilla).filter(Semilla.id == semilla_id).first()

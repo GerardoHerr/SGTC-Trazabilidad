@@ -65,12 +65,34 @@ export const updateSemillaAnexo = async (semillaId, anexo) => {
         const blob = await resp.blob();
         formData.append('anexo', blob, anexo.name);
     } catch {
+        // Fallback para React Native nativo
         formData.append('anexo', {
             uri: anexo.uri,
             type: anexo.mimeType || 'application/octet-stream',
             name: anexo.name,
         });
     }
-    const response = await axios.patch(`${Config.API_URL}/semillas/${semillaId}/anexo`, formData);
-    return response.data;
+    // Usamos fetch (no axios) para que el navegador calcule el boundary correcto
+    const resp = await fetch(`${Config.API_URL}/semillas/${semillaId}/anexo`, {
+        method: 'PATCH',
+        body: formData,
+    });
+    if (!resp.ok) {
+        let detail = 'Error al actualizar el archivo';
+        try { detail = (await resp.json()).detail ?? detail; } catch {}
+        throw { response: { data: { detail } } };
+    }
+    return resp.json();
+};
+
+export const deleteAnexoSemilla = async (semillaId) => {
+    const resp = await fetch(`${Config.API_URL}/semillas/${semillaId}/anexo`, {
+        method: 'DELETE',
+    });
+    if (!resp.ok) {
+        let detail = 'Error al eliminar el archivo';
+        try { detail = (await resp.json()).detail ?? detail; } catch {}
+        throw { response: { data: { detail } } };
+    }
+    return resp.json();
 };
