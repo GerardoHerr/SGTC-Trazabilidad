@@ -5,9 +5,14 @@ function getApiUrl() {
     if (Platform.OS === 'web') {
         return 'http://localhost:8000';
     }
-    // En dispositivo físico (Expo Go via QR), el hostUri contiene la IP de la máquina de desarrollo
-    const hostUri = Constants.expoConfig?.hostUri ?? '';
+    // Expo Go en dispositivo físico: hostUri = "192.168.x.x:8081"
+    const hostUri =
+        Constants.expoConfig?.hostUri ??          // SDK 46+
+        Constants.manifest2?.extra?.expoClient?.hostUri ?? // SDK 45
+        Constants.manifest?.debuggerHost ??       // SDK <46
+        '';
     const ip = hostUri.split(':')[0] || 'localhost';
+    console.log('[Config] API_URL =>', `http://${ip}:8000`);
     return `http://${ip}:8000`;
 }
 
