@@ -18,6 +18,7 @@ export const createSemilla = async (semillaData, anexo) => {
         // Agregar datos de semilla directamente
         formData.append('variedad', semillaData.variedad || '');
         formData.append('origen', semillaData.origen || '');
+        formData.append('distribuidor', semillaData.distribuidor || '');
         formData.append('metodo_secado', semillaData.metodo_secado || '');
         formData.append('seleccion', semillaData.seleccion || '');
         formData.append('olor', semillaData.olor || '');
@@ -50,4 +51,48 @@ export const createSemilla = async (semillaData, anexo) => {
         console.error("Error creating semilla:", error);
         throw error;
     }
+};
+
+export const getSemillaById = async (id) => {
+    const response = await axios.get(`${Config.API_URL}/semillas/${id}`);
+    return response.data;
+};
+
+export const updateSemillaAnexo = async (semillaId, anexo) => {
+    const formData = new FormData();
+    try {
+        const resp = await fetch(anexo.uri);
+        const blob = await resp.blob();
+        formData.append('anexo', blob, anexo.name);
+    } catch {
+        // Fallback para React Native nativo
+        formData.append('anexo', {
+            uri: anexo.uri,
+            type: anexo.mimeType || 'application/octet-stream',
+            name: anexo.name,
+        });
+    }
+    // Usamos fetch (no axios) para que el navegador calcule el boundary correcto
+    const resp = await fetch(`${Config.API_URL}/semillas/${semillaId}/anexo`, {
+        method: 'PATCH',
+        body: formData,
+    });
+    if (!resp.ok) {
+        let detail = 'Error al actualizar el archivo';
+        try { detail = (await resp.json()).detail ?? detail; } catch {}
+        throw { response: { data: { detail } } };
+    }
+    return resp.json();
+};
+
+export const deleteAnexoSemilla = async (semillaId) => {
+    const resp = await fetch(`${Config.API_URL}/semillas/${semillaId}/anexo`, {
+        method: 'DELETE',
+    });
+    if (!resp.ok) {
+        let detail = 'Error al eliminar el archivo';
+        try { detail = (await resp.json()).detail ?? detail; } catch {}
+        throw { response: { data: { detail } } };
+    }
+    return resp.json();
 };

@@ -215,6 +215,7 @@ export default function AgregarPersonal() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [newWorkerId, setNewWorkerId] = useState<number | null>(null);
 
     const handleChange = (field: keyof FormState, value: string) => {
         let filtered = value;
@@ -246,13 +247,14 @@ export default function AgregarPersonal() {
         if (!validateForm()) return;
         try {
             setLoading(true);
-            await createPersonal({
+            const created = await createPersonal({
                 nombres: form.nombres.trim(),
                 apellidos: form.apellidos.trim(),
                 identificacion: form.identificacion.trim(),
                 telefono: form.telefono.trim(),
                 rol: form.rol,
             });
+            setNewWorkerId(created?.id ?? null);
             setSuccess(true);
         } catch (err: any) {
             const detail = err?.response?.data?.detail;
@@ -271,6 +273,8 @@ export default function AgregarPersonal() {
             const timer = setTimeout(() => {
                 if (loteIdRetorno) {
                     router.replace({ pathname: '/lote/[id]' as any, params: { id: loteIdRetorno } });
+                } else if (newWorkerId) {
+                    router.replace({ pathname: '/personal/[id]' as any, params: { id: newWorkerId } });
                 } else {
                     router.back();
                 }

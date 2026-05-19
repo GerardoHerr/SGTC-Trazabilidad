@@ -61,8 +61,9 @@ export default function AgregarLotes() {
 
     const calcularDistribucionRegular = (p: any, cantidad: number) => {
         if (!p || cantidad < 1) { setDistribuciones([]); return; }
-        const disponibles = p.hectareas - hectareasUsadas;
-        const ha = Math.max(0, Math.round((disponibles / cantidad + Number.EPSILON) * 100) / 100);
+        const disponibles = Math.max(0, p.hectareas - hectareasUsadas);
+        if (disponibles <= 0) { setDistribuciones([]); return; }
+        const ha = Math.round((disponibles / cantidad + Number.EPSILON) * 100) / 100;
         setDistribuciones(
             Array.from({ length: cantidad }, (_, i) => ({
                 numero_lote: i + 1,
@@ -75,6 +76,8 @@ export default function AgregarLotes() {
     const handleCantidadChange = (text: string) => {
         setCantidadLotes(text);
         const n = parseInt(text) || 0;
+        const disponibles = parcela ? parcela.hectareas - hectareasUsadas : 0;
+        if (disponibles <= 0) { setDistribuciones([]); return; }
         if (n > 0 && parcela) calcularDistribucionRegular(parcela, n);
         else setDistribuciones([]);
     };
@@ -87,16 +90,34 @@ export default function AgregarLotes() {
 
     const validar = (): boolean => {
         setError('');
-        if (distribuciones.length === 0) { setError('No hay lotes para crear.'); return false; }
-        const totalHa = distribuciones.reduce((s, d) => s + d.hectareas, 0);
         const disponibles = parcela.hectareas - hectareasUsadas;
-        if (totalHa > disponibles + 0.001) {
-            setError(`Las hectáreas (${totalHa.toFixed(2)}) superan el espacio disponible (${disponibles.toFixed(2)} ha).`);
+
+        if (disponibles <= 0) {
+            setError('Esta parcela no tiene espacio disponible. Todas las hectáreas ya están asignadas a lotes existentes.');
             return false;
         }
+        if (distribuciones.length === 0) {
+            setError('No hay lotes para crear. Ingresa una cantidad válida.');
+            return false;
+        }
+
         if (parcela.tipo_terreno === 'Regular') {
             const n = parseInt(cantidadLotes);
             if (n < 1) { setError('La cantidad de lotes debe ser mayor a 0.'); return false; }
+
+            // Mínimo 1 ha por lote
+            for (let i = 0; i < distribuciones.length; i++) {
+                if (distribuciones[i].hectareas < 1) {
+                    setError(`El lote ${i + 1} tiene ${distribuciones[i].hectareas} ha. Cada lote debe tener al menos 1 hectárea.`);
+                    return false;
+                }
+            }
+        }
+
+        const totalHa = distribuciones.reduce((s, d) => s + d.hectareas, 0);
+        if (totalHa > disponibles + 0.001) {
+            setError(`Las hectáreas asignadas (${totalHa.toFixed(2)} ha) superan el espacio disponible (${disponibles.toFixed(2)} ha).`);
+            return false;
         }
         return true;
     };
@@ -137,6 +158,7 @@ export default function AgregarLotes() {
 
     const isIrregular = parcela.tipo_terreno === 'Irregular';
     const disponibles = parcela.hectareas - hectareasUsadas;
+    const sinEspacio = disponibles <= 0;
     const totalNuevo = distribuciones.reduce((s, d) => s + d.hectareas, 0);
 
     return (
@@ -156,6 +178,14 @@ export default function AgregarLotes() {
 
             <ScrollView contentContainerStyle={st.scroll}>
                 {/* Banners */}
+                {sinEspacio && (
+                    <View style={[st.banner, { borderColor: '#f59e0b', backgroundColor: '#f59e0b15' }]}>
+                        <MaterialCommunityIcons name="alert" size={16} color="#f59e0b" />
+                        <Text style={{ flex: 1, color: '#f59e0b', fontSize: 13 }}>
+                            Esta parcela no tiene espacio disponible. Todas las hectáreas ya están asignadas.
+                        </Text>
+                    </View>
+                )}
                 {error !== '' && (
                     <View style={[st.banner, { borderColor: c.error, backgroundColor: c.error + '15' }]}>
                         <MaterialCommunityIcons name="alert-circle" size={16} color={c.error} />
@@ -274,7 +304,7 @@ export default function AgregarLotes() {
                     onPress={handleGuardar}
                     variant="primary"
                     style={{ flex: 1 }}
-                    disabled={saving || distribuciones.length === 0}
+                    disabled={saving || sinEspacio || distribuciones.length === 0}
                 />
             </View>
         </View>
